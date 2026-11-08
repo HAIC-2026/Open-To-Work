@@ -162,6 +162,24 @@ export const togglePin = mutation({
   },
 })
 
+export const moveToFolder = mutation({
+  args: {
+    id: v.id("conversations"),
+    folderId: v.optional(v.id("folders")),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const conv = await ctx.db.get(args.id)
+    if (!conv) {
+      throw new Error("Conversation not found")
+    }
+    await ctx.db.patch(args.id, {
+      folderId: args.folderId,
+    })
+    return null
+  },
+})
+
 export const remove = mutation({
   args: { id: v.id("conversations") },
   returns: v.null(),
