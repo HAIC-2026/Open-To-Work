@@ -1,7 +1,16 @@
 "use client"
 
 import * as React from "react"
-import { ArrowUpIcon, PlusIcon, Map, ChevronDown } from "lucide-react"
+import {
+  ArrowUpIcon,
+  PlusIcon,
+  Map,
+  ChevronDown,
+  PaperclipIcon,
+  TelescopeIcon,
+  GlobeIcon,
+} from "lucide-react"
+import { Spinner } from "@/components/ui/spinner"
 
 import {
   InputGroup,
@@ -9,6 +18,13 @@ import {
   InputGroupButton,
   InputGroupTextarea,
 } from "@/components/ui/input-group"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   Popover,
   PopoverContent,
@@ -37,11 +53,15 @@ const SENATE_DISTRICTS = Array.from(
 export interface PromptInputProps {
   onSubmit?: (prompt: string, district?: string) => void
   placeholder?: string
+  isLoading?: boolean
+  disabled?: boolean
 }
 
 export function PromptInput({
   onSubmit: onSubmitProp,
   placeholder = "Ask about this district...",
+  isLoading = false,
+  disabled = false,
 }: PromptInputProps) {
   const [text, setText] = React.useState("")
   const [selectedDistrict, setSelectedDistrict] = React.useState("House District 1")
@@ -76,7 +96,7 @@ export function PromptInput({
         />
 
         <InputGroupAddon align="block-end" className="flex items-center justify-between">
-          {/* Left: File attachment button */}
+          {/* Left: Add Context / File attachment DropdownMenu */}
           <div className="flex items-center">
             <input
               type="file"
@@ -84,15 +104,36 @@ export function PromptInput({
               className="hidden"
               multiple
             />
-            <InputGroupButton
-              size="icon-sm"
-              variant="outline"
-              className="rounded-full"
-              aria-label="Attach files"
-              onClick={() => inputRef.current?.click()}
-            >
-              <PlusIcon />
-            </InputGroupButton>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <InputGroupButton
+                    size="icon-sm"
+                    variant="outline"
+                    className="rounded-full"
+                    aria-label="Add context"
+                    type="button"
+                  />
+                }
+              >
+                <PlusIcon />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" side="top" className="w-48">
+                <DropdownMenuItem onClick={() => inputRef.current?.click()}>
+                  <PaperclipIcon />
+                  <span>Add Photos & Files</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>
+                  <TelescopeIcon />
+                  <span>Deep Research</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <GlobeIcon />
+                  <span>Web Search</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           {/* Right: Pair of buttons (District Dropdown + District Map) and Send Button */}
@@ -179,10 +220,10 @@ export function PromptInput({
               size="icon-sm"
               variant="default"
               className="rounded-full"
-              disabled={!canSend}
+              disabled={!canSend || isLoading || disabled}
               aria-label="Send"
             >
-              <ArrowUpIcon />
+              {isLoading ? <Spinner /> : <ArrowUpIcon />}
             </InputGroupButton>
           </div>
         </InputGroupAddon>

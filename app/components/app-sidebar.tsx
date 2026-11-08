@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import {
   Plus,
@@ -18,6 +18,7 @@ import {
   Monitor,
   Sun,
   Moon,
+  Trash2,
 } from "lucide-react"
 
 import {
@@ -55,6 +56,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useQuery, useMutation } from "convex/react"
+import { api } from "@/convex/_generated/api"
+import { cn } from "@/lib/utils"
 
 export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   appName?: string
@@ -72,6 +77,15 @@ export function AppSidebar({
   ...props
 }: AppSidebarProps) {
   const pathname = usePathname()
+  const router = useRouter()
+  const recents = useQuery(api.conversations.list)
+  const projectFolders = useQuery(api.folders.listWithConversations)
+  const removeConversation = useMutation(api.conversations.remove)
+  const createConversation = useMutation(api.conversations.create)
+  const togglePin = useMutation(api.conversations.togglePin)
+  const removeFolder = useMutation(api.folders.remove)
+  const initDefaults = useMutation(api.folders.initDefaults)
+
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = React.useState(false)
 
@@ -84,6 +98,13 @@ export function AppSidebar({
   React.useEffect(() => {
     setMounted(true)
   }, [])
+
+  // Auto-seed default project folders if none exist yet
+  React.useEffect(() => {
+    if (projectFolders !== undefined && projectFolders.length === 0) {
+      initDefaults()
+    }
+  }, [projectFolders, initDefaults])
 
   const availableUsers = [
     { name: "Alex Chen", district: "House District 1", initials: "AC" },
@@ -106,37 +127,6 @@ export function AppSidebar({
       title: "Collaborate",
       url: "/collaborate",
       icon: Users,
-    },
-  ]
-
-  const projectFolders = [
-    {
-      id: "district-initiatives",
-      name: "District Initiatives",
-      defaultOpen: true,
-      conversations: [
-        { title: "Housing & Zoning Reform", url: "/conversations/housing" },
-        { title: "Public Transit Expansion", url: "/conversations/transit" },
-        { title: "Clean Energy Grants", url: "/conversations/clean-energy" },
-      ],
-    },
-    {
-      id: "constituent-services",
-      name: "Constituent Services",
-      defaultOpen: true,
-      conversations: [
-        { title: "Town Hall Feedback Q1", url: "/conversations/town-hall" },
-        { title: "Casework Tracker", url: "/conversations/casework" },
-      ],
-    },
-    {
-      id: "legislative-research",
-      name: "Legislative Research",
-      defaultOpen: false,
-      conversations: [
-        { title: "2026 Budget Overview", url: "/conversations/budget" },
-        { title: "Education Funding Bill", url: "/conversations/education" },
-      ],
     },
   ]
 
@@ -203,117 +193,255 @@ export function AppSidebar({
 
           <SidebarGroupContent>
             <SidebarMenu>
-              {projectFolders.map((folder) => (
-                <Collapsible
-                  key={folder.id}
-                  defaultOpen={folder.defaultOpen}
-                  className="group/collapsible"
-                >
-                  <SidebarMenuItem className="group/menu-item relative">
-                    {/* Folder Trigger Button: Shows Folder icon when closed, FolderOpen when opened */}
-                    <CollapsibleTrigger
-                      render={
-                        <SidebarMenuButton
-                          tooltip={folder.name}
-                          className="h-8 pr-16"
-                        >
-                          <Folder className="size-4 group-data-open/collapsible:hidden" />
-                          <FolderOpen className="size-4 hidden group-data-open/collapsible:block" />
-                          <span className="truncate">{folder.name}</span>
-                        </SidebarMenuButton>
-                      }
-                    />
+              {projectFolders === undefined ? (
+                <div className="flex flex-col gap-1 px-2 py-1">
+                  <Skeleton className="h-7 w-full rounded-md" />
+                  <Skeleton className="h-7 w-full rounded-md" />
+                  <Skeleton className="h-7 w-full rounded-md" />
+                </div>
+              ) : projectFolders.length === 0 ? (
+                <div className="px-3 py-1.5 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
+                  No projects yet
+                </div>
+              ) : (
+                projectFolders.map((folder) => (
+                  <Collapsible
+                    key={folder._id}
+                    defaultOpen={folder.defaultOpen ?? true}
+                    className="group/collapsible"
+                  >
+                    <SidebarMenuItem className="group/menu-item relative">
+                      {/* Folder Trigger Button: Shows Folder icon when closed, FolderOpen when opened */}
+                      <CollapsibleTrigger
+                        render={
+                          <SidebarMenuButton
+                            tooltip={folder.name}
+                            className="h-8 pr-16"
+                          >
+                            <Folder className="size-4 group-data-open/collapsible:hidden" />
+                            <FolderOpen className="size-4 hidden group-data-open/collapsible:block" />
+                            <span className="truncate">{folder.name}</span>
+                          </SidebarMenuButton>
+                        }
+                      />
 
-                    {/* Pair of buttons for Folder: Fixed at h-8 top-0, strictly appears on mouse hover without lingering */}
-                    <div className="absolute right-1 top-0 h-8 flex items-center gap-1 opacity-0 group-hover/menu-item:opacity-100 transition-opacity duration-150 group-data-[collapsible=icon]:hidden pointer-events-none group-hover/menu-item:pointer-events-auto">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                        }}
-                        className="size-7 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                        title="Folder options"
-                      >
-                        <MoreVertical className="size-4" />
-                        <span className="sr-only">Folder options</span>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                        }}
-                        className="size-7 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                        title="Add to folder"
-                      >
-                        <Plus className="size-4" />
-                        <span className="sr-only">Add to folder</span>
-                      </Button>
-                    </div>
-
-                    {/* Nested Conversations Submenu */}
-                    <CollapsibleContent>
-                      <SidebarMenuSub className="ml-3.5 mr-0 pl-2.5 pr-0">
-                        {folder.conversations.map((conv) => {
-                          const isConvActive = pathname === conv.url
-                          return (
-                            <SidebarMenuSubItem
-                              key={conv.title}
-                              className="group/subitem relative"
+                      {/* Pair of buttons for Folder: Fixed at h-8 top-0, strictly appears on mouse hover without lingering */}
+                      <div className="absolute right-1 top-0 h-8 flex items-center gap-1 opacity-0 group-hover/menu-item:opacity-100 transition-opacity duration-150 group-data-[collapsible=icon]:hidden pointer-events-none group-hover/menu-item:pointer-events-auto">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger
+                            render={
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                type="button"
+                                className="size-7 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                                title="Folder options"
+                              />
+                            }
+                          >
+                            <MoreVertical className="size-4" />
+                            <span className="sr-only">Folder options</span>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" side="right" sideOffset={4}>
+                            <DropdownMenuItem
+                              variant="destructive"
+                              onClick={async (e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                await removeFolder({ id: folder._id })
+                              }}
                             >
-                              <SidebarMenuSubButton
-                                render={<Link href={conv.url} />}
-                                isActive={isConvActive}
-                                className="h-8 pr-16"
-                              >
-                                <MessageSquare className="size-4" />
-                                <span className="truncate">{conv.title}</span>
-                              </SidebarMenuSubButton>
+                              <Trash2 className="size-4" />
+                              <span>Delete Folder</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
 
-                              {/* Pair of buttons for Conversation: Strictly appears on hover without lingering */}
-                              <div className="absolute right-1 top-0 h-8 flex items-center gap-1 opacity-0 group-hover/subitem:opacity-100 transition-opacity duration-150 group-data-[collapsible=icon]:hidden pointer-events-none group-hover/subitem:pointer-events-auto">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.preventDefault()
-                                    e.stopPropagation()
-                                  }}
-                                  className="size-7 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                                  title="Pin conversation"
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          type="button"
+                          onClick={async (e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            const newId = await createConversation({
+                              title: "New conversation",
+                              district: currentUser.district,
+                              folderId: folder._id,
+                            })
+                            router.push(`/conversations/${newId}`)
+                          }}
+                          className="size-7 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                          title="Add to folder"
+                        >
+                          <Plus className="size-4" />
+                          <span className="sr-only">Add to folder</span>
+                        </Button>
+                      </div>
+
+                      {/* Nested Conversations Submenu */}
+                      <CollapsibleContent>
+                        <SidebarMenuSub className="ml-3.5 mr-0 pl-2.5 pr-0">
+                          {folder.conversations.length === 0 ? (
+                            <div className="px-2 py-1 text-xs text-muted-foreground">
+                              Empty folder
+                            </div>
+                          ) : (
+                            folder.conversations.map((conv) => {
+                              const isConvActive = pathname === `/conversations/${conv._id}`
+                              return (
+                                <SidebarMenuSubItem
+                                  key={conv._id}
+                                  className="group/subitem relative"
                                 >
-                                  <Pin className="size-4" />
-                                  <span className="sr-only">Pin conversation</span>
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.preventDefault()
-                                    e.stopPropagation()
-                                  }}
-                                  className="size-7 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                                  title="Conversation options"
-                                >
-                                  <MoreVertical className="size-4" />
-                                  <span className="sr-only">Conversation options</span>
-                                </Button>
-                              </div>
-                            </SidebarMenuSubItem>
-                          )
-                        })}
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  </SidebarMenuItem>
-                </Collapsible>
-              ))}
+                                  <SidebarMenuSubButton
+                                    render={<Link href={`/conversations/${conv._id}`} />}
+                                    isActive={isConvActive}
+                                    className="h-8 pr-16"
+                                  >
+                                    <MessageSquare className="size-4 shrink-0" />
+                                    <span className="truncate">{conv.title}</span>
+                                  </SidebarMenuSubButton>
+
+                                  {/* Pair of buttons for Conversation: Strictly appears on hover without lingering */}
+                                  <div className="absolute right-1 top-0 h-8 flex items-center gap-1 opacity-0 group-hover/subitem:opacity-100 transition-opacity duration-150 group-data-[collapsible=icon]:hidden pointer-events-none group-hover/subitem:pointer-events-auto">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      type="button"
+                                      onClick={async (e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        await togglePin({ id: conv._id })
+                                      }}
+                                      className="size-7 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                                      title={conv.isPinned ? "Unpin conversation" : "Pin conversation"}
+                                    >
+                                      <Pin
+                                        className={cn(
+                                          "size-4",
+                                          conv.isPinned && "fill-current text-primary"
+                                        )}
+                                      />
+                                      <span className="sr-only">
+                                        {conv.isPinned ? "Unpin" : "Pin"}
+                                      </span>
+                                    </Button>
+
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger
+                                        render={
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            type="button"
+                                            className="size-7 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                                            title="Conversation options"
+                                          />
+                                        }
+                                      >
+                                        <MoreVertical className="size-4" />
+                                        <span className="sr-only">Conversation options</span>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end" side="right" sideOffset={4}>
+                                        <DropdownMenuItem
+                                          variant="destructive"
+                                          onClick={async (e) => {
+                                            e.preventDefault()
+                                            e.stopPropagation()
+                                            await removeConversation({ id: conv._id })
+                                            if (isConvActive) {
+                                              router.push("/new")
+                                            }
+                                          }}
+                                        >
+                                          <Trash2 className="size-4" />
+                                          <span>Delete</span>
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </div>
+                                </SidebarMenuSubItem>
+                              )
+                            })
+                          )}
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
+                ))
+              )}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Recents Group (placed below Projects) */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Recents</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {recents === undefined ? (
+                <div className="flex flex-col gap-1 px-2 py-1">
+                  <Skeleton className="h-7 w-full rounded-md" />
+                  <Skeleton className="h-7 w-full rounded-md" />
+                </div>
+              ) : recents.length === 0 ? (
+                <div className="px-3 py-1.5 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
+                  No recent conversations
+                </div>
+              ) : (
+                recents.map((conv) => {
+                  const isActive = pathname === `/conversations/${conv._id}`
+                  return (
+                    <SidebarMenuItem key={conv._id} className="group/menu-item relative">
+                      <SidebarMenuButton
+                        render={<Link href={`/conversations/${conv._id}`} />}
+                        isActive={isActive}
+                        tooltip={conv.title}
+                        className="h-8 pr-8"
+                      >
+                        <MessageSquare className="size-4 shrink-0" />
+                        <span className="truncate">{conv.title}</span>
+                      </SidebarMenuButton>
+
+                      <div className="absolute right-1 top-0 h-8 flex items-center gap-1 opacity-0 group-hover/menu-item:opacity-100 transition-opacity duration-150 group-data-[collapsible=icon]:hidden pointer-events-none group-hover/menu-item:pointer-events-auto">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger
+                            render={
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                type="button"
+                                className="size-7 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                                title="Conversation options"
+                              />
+                            }
+                          >
+                            <MoreVertical className="size-4" />
+                            <span className="sr-only">Conversation options</span>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" side="right" sideOffset={4}>
+                            <DropdownMenuItem
+                              variant="destructive"
+                              onClick={async (e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                await removeConversation({ id: conv._id })
+                                if (isActive) {
+                                  router.push("/new")
+                                }
+                              }}
+                            >
+                              <Trash2 className="size-4" />
+                              <span>Delete</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </SidebarMenuItem>
+                  )
+                })
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

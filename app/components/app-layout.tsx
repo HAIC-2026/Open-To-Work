@@ -10,16 +10,15 @@ import { AppSidebar, type AppSidebarProps } from "@/components/app-sidebar"
 export interface AppLayoutProps {
   children: React.ReactNode
   sidebarProps?: AppSidebarProps
+  className?: string
 }
 
-export function AppLayout({ children, sidebarProps }: AppLayoutProps) {
+export function AppLayout({ children, sidebarProps, className }: AppLayoutProps) {
   return (
     <SidebarProvider>
       <AppSidebar {...sidebarProps} />
-      <SidebarInset>
-        <main className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-          {children}
-        </main>
+      <SidebarInset className={className}>
+        {children}
       </SidebarInset>
     </SidebarProvider>
   )

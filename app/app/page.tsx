@@ -1,9 +1,5 @@
-import { AppLayout } from "@/components/app-layout"
+import { redirect } from "next/navigation"
 
 export default function Page() {
-  return (
-    <AppLayout>
-      <div className="flex flex-1 flex-col" />
-    </AppLayout>
-  )
+  redirect("/new")
 }
