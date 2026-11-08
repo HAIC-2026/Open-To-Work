@@ -584,6 +584,19 @@ export function AppSidebar({
     setOpenFolders((prev) => ({ ...prev, [folderId]: open }))
   }, [])
 
+  // Auto-expand folder if the active conversation is inside it
+  React.useEffect(() => {
+    if (!projectFolders || !pathname) return
+    for (const folder of projectFolders) {
+      const hasActiveConv = folder.conversations.some(
+        (conv) => pathname === `/conversations/${conv._id}`
+      )
+      if (hasActiveConv && openFolders[folder._id] === undefined) {
+        setOpenFolders((prev) => ({ ...prev, [folder._id]: true }))
+      }
+    }
+  }, [projectFolders, pathname, openFolders])
+
   const [currentUser, setCurrentUser] = React.useState({
     name: userName,
     district: houseDistrict,

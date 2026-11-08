@@ -5,7 +5,6 @@ import Link from "next/link"
 import { useQuery, useMutation } from "convex/react"
 import { api } from "@/convex/_generated/api"
 import type { Id } from "@/convex/_generated/dataModel"
-import { AppLayout } from "@/components/app-layout"
 import { PromptInput } from "@/components/prompt-input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -138,49 +137,44 @@ export default function ConversationPage({
 
   if (conversation === undefined || messages === undefined) {
     return (
-      <AppLayout>
-        <div className="flex flex-1 flex-col p-6 md:p-8">
-          <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
-            <Skeleton className="h-8 w-2/3 rounded-lg" />
-            <Skeleton className="h-4 w-32 rounded-md" />
-            <div className="mt-8 flex flex-col gap-6">
-              <Skeleton className="ml-auto h-16 w-3/4 rounded-3xl" />
-              <Skeleton className="h-24 w-full rounded-2xl" />
-              <Skeleton className="ml-auto h-14 w-2/3 rounded-3xl" />
-            </div>
+      <div className="flex flex-1 flex-col p-6 md:p-8">
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
+          <Skeleton className="h-8 w-2/3 rounded-lg" />
+          <Skeleton className="h-4 w-32 rounded-md" />
+          <div className="mt-8 flex flex-col gap-6">
+            <Skeleton className="ml-auto h-16 w-3/4 rounded-3xl" />
+            <Skeleton className="h-24 w-full rounded-2xl" />
+            <Skeleton className="ml-auto h-14 w-2/3 rounded-3xl" />
           </div>
         </div>
-      </AppLayout>
+      </div>
     )
   }
 
   if (conversation === null) {
     return (
-      <AppLayout>
-        <div className="flex flex-1 flex-col items-center justify-center p-6 text-center">
-          <Empty className="max-w-md">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <MessageCircleDashedIcon />
-              </EmptyMedia>
-              <EmptyTitle>Conversation not found</EmptyTitle>
-              <EmptyDescription>
-                This conversation might have been removed or does not exist.
-              </EmptyDescription>
-            </EmptyHeader>
-            <Button nativeButton={false} render={<Link href="/new" />} className="mt-2">
-              <PlusIcon data-icon="inline-start" />
-              Start New Chat
-            </Button>
-          </Empty>
-        </div>
-      </AppLayout>
+      <div className="flex flex-1 flex-col items-center justify-center p-6 text-center">
+        <Empty className="max-w-md">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <MessageCircleDashedIcon />
+            </EmptyMedia>
+            <EmptyTitle>Conversation not found</EmptyTitle>
+            <EmptyDescription>
+              This conversation might have been removed or does not exist.
+            </EmptyDescription>
+          </EmptyHeader>
+          <Button nativeButton={false} render={<Link href="/new" />} className="mt-2">
+            <PlusIcon data-icon="inline-start" />
+            Start New Chat
+          </Button>
+        </Empty>
+      </div>
     )
   }
 
   return (
-    <AppLayout>
-      <MessageScrollerProvider autoScroll>
+    <MessageScrollerProvider autoScroll>
         <div className="relative flex w-full flex-1 flex-col h-full min-h-0 bg-background overflow-hidden">
           {/* Header with Title and District Badge */}
           <div className="flex shrink-0 items-center justify-between border-b px-6 py-3.5 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
@@ -345,6 +339,5 @@ export default function ConversationPage({
           </div>
         </div>
       </MessageScrollerProvider>
-    </AppLayout>
   )
 }
