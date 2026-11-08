@@ -31,7 +31,7 @@ export default function NewPage() {
 
   return (
     <AppLayout>
-      <div className="relative flex flex-1 flex-col items-center justify-center p-4 md:p-8 min-h-svh overflow-hidden">
+      <div className="relative flex flex-1 flex-col items-center justify-center p-4 md:p-8 h-full min-h-0 overflow-hidden">
         {/* Main interactive area: perfectly centered as before */}
         <div className="relative z-10 flex w-full max-w-2xl flex-col items-center">
           {/* Big headline with magnifying glass icon on the left */}

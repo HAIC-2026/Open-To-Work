@@ -11,6 +11,7 @@ import {
   GlobeIcon,
 } from "lucide-react"
 import { Spinner } from "@/components/ui/spinner"
+import { cn } from "cn"
 
 import {
   InputGroup,
@@ -55,6 +56,7 @@ export interface PromptInputProps {
   placeholder?: string
   isLoading?: boolean
   disabled?: boolean
+  className?: string
 }
 
 export function PromptInput({
@@ -62,6 +64,7 @@ export function PromptInput({
   placeholder = "Ask about this district...",
   isLoading = false,
   disabled = false,
+  className,
 }: PromptInputProps) {
   const [text, setText] = React.useState("")
   const [selectedDistrict, setSelectedDistrict] = React.useState("House District 1")
@@ -81,7 +84,7 @@ export function PromptInput({
 
   return (
     <form ref={formRef} onSubmit={onSubmit}>
-      <InputGroup>
+      <InputGroup className={cn("bg-background border border-foreground/20 dark:border-foreground/20 shadow-md", className)}>
         <InputGroupTextarea
           value={text}
           onChange={(event) => setText(event.target.value)}

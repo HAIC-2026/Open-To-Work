@@ -183,7 +183,7 @@ export default function ConversationPage({
       <MessageScrollerProvider autoScroll>
         <div className="relative flex w-full flex-1 flex-col h-full min-h-0 bg-background overflow-hidden">
           {/* Header with Title and District Badge */}
-          <div className="flex shrink-0 items-center justify-between border-b px-6 py-3.5">
+          <div className="flex shrink-0 items-center justify-between border-b px-6 py-3.5 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
             <div className="flex items-center gap-3 truncate">
               <h1 className="truncate text-base font-semibold text-foreground md:text-lg">
                 {conversation.title}
@@ -198,7 +198,7 @@ export default function ConversationPage({
           </div>
 
           {/* Thread Area (Message Scroller) */}
-          <div className="min-h-0 flex-1">
+          <div className="relative min-h-0 flex-1">
             {messages.length === 0 ? (
               <Empty className="h-full">
                 <EmptyHeader>
@@ -213,10 +213,10 @@ export default function ConversationPage({
               </Empty>
             ) : (
               <MessageScroller>
-                <MessageScrollerViewport>
+                <MessageScrollerViewport className="[mask-image:none]">
                   <MessageScrollerContent
                     aria-busy={isSubmitting}
-                    className="gap-6 px-6 md:px-8 py-6 max-w-3xl mx-auto"
+                    className="gap-6 px-6 md:px-8 pt-6 pb-48 max-w-3xl mx-auto"
                   >
                     {messages.map((message) => {
                       if (message.role === "user") {
@@ -327,18 +327,21 @@ export default function ConversationPage({
                     })}
                   </MessageScrollerContent>
                 </MessageScrollerViewport>
-                <MessageScrollerButton />
+                <MessageScrollerButton className="data-[direction=end]:bottom-[168px] z-30 shadow-md border bg-background/95 backdrop-blur hover:bg-muted" />
               </MessageScroller>
             )}
           </div>
 
-          {/* Prompt Input Footer (always visible anchored at the bottom) */}
-          <div className="shrink-0 p-6 md:p-8 pt-0 max-w-3xl w-full mx-auto">
-            <PromptInput
-              placeholder="Ask about this district..."
-              onSubmit={handleSendMessage}
-              isLoading={isSubmitting}
-            />
+          {/* Floating Prompt Input with Transparent Whitespace */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col bg-transparent pb-6 md:pb-8">
+            <div className="pointer-events-auto mx-auto w-full max-w-3xl px-6 md:px-8">
+              <PromptInput
+                placeholder="Ask about this district..."
+                onSubmit={handleSendMessage}
+                isLoading={isSubmitting}
+                className="shadow-lg"
+              />
+            </div>
           </div>
         </div>
       </MessageScrollerProvider>
