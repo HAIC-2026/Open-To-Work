@@ -1,0 +1,311 @@
+{
+  "version": 1,
+  "skills": {
+    "animate": {
+      "source": "emilkowalski/skill",
+      "sourceType": "github",
+      "skillPath": "skills/animate/SKILL.md",
+      "computedHash": "f76ddd3d4446c3c56a143ea98650c370b3e8f88e6203d1e22082d2082bf1eed7"
+    },
+    "animate-expo": {
+      "source": "emilkowalski/skill",
+      "sourceType": "github",
+      "skillPath": "skills/animate-expo/SKILL.md",
+      "computedHash": "5de09593d564091f9db60aabede7bed760251e118548272050a247c653c417d2"
+    },
+    "animation-performance": {
+      "source": "emilkowalski/skill",
+      "sourceType": "github",
+      "skillPath": "skills/animation-performance/SKILL.md",
+      "computedHash": "333f6a387124d0eda927614671f8be3a00d1ddeb9f43cf8b7fa7032630414311"
+    },
+    "animation-vocabulary": {
+      "source": "emilkowalski/skill",
+      "sourceType": "github",
+      "skillPath": "skills/animation-vocabulary/SKILL.md",
+      "computedHash": "0058036865ecbb864fd0c4132efcc62425355d6e99c7e6ef6a936742d62a5dea"
+    },
+    "apple-design": {
+      "source": "emilkowalski/skill",
+      "sourceType": "github",
+      "skillPath": "skills/apple-design/SKILL.md",
+      "computedHash": "0190417d092a0df447b000154e39733ea6d97efad6d3bec8a6ce3845aeb88914"
+    },
+    "ask-sonner": {
+      "source": "emilkowalski/skill",
+      "sourceType": "github",
+      "skillPath": "skills/ask-sonner/SKILL.md",
+      "computedHash": "8bd257b845985f4b35b603b510a126604176521094af79c4b7347ffeb8a8f7ab"
+    },
+    "break-ui": {
+      "source": "emilkowalski/skill",
+      "sourceType": "github",
+      "skillPath": "skills/break-ui/SKILL.md",
+      "computedHash": "60ada67662925f4df5e3c6ff41cac3ab241b66f8898100a5ffcd7ba7196cb868"
+    },
+    "convex": {
+      "source": "convex/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/convex/SKILL.md",
+      "computedHash": "d8d267be1af449b19eaf05a7b1716ed903e1bc4de2e67a911f67859f341c5337"
+    },
+    "convex-add": {
+      "source": "convex/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/convex-add/SKILL.md",
+      "computedHash": "cbec5bc013f57a6d1c8ede5793a21a58b2eee48745f4a63c3403dee1417d3fec"
+    },
+    "convex-advisor": {
+      "source": "convex/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/convex-advisor/SKILL.md",
+      "computedHash": "71fb0804b7a96a85a21493202a9bac891700d1a3bbdd8d092e0cb5711f9a88d2"
+    },
+    "convex-agent": {
+      "source": "convex/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/convex-agent/SKILL.md",
+      "computedHash": "ac81a09f9c6f13f90a816fb66d33f02e15ba32a931f3c72033ad54b2f0682872"
+    },
+    "convex-auth": {
+      "source": "convex/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/convex-auth/SKILL.md",
+      "computedHash": "e1b348dd4ac8fbac77a8017a97f34e674fb390e1fea4d6c084d84fb61dfe8176"
+    },
+    "convex-authz": {
+      "source": "convex/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/convex-authz/SKILL.md",
+      "computedHash": "b8f20fe9a70ccfb4d5ce464ad818fd8a66e3ec84695f22fb8def92b4af27d44b"
+    },
+    "convex-backup": {
+      "source": "convex/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/convex-backup/SKILL.md",
+      "computedHash": "53d3cc3247f0212da029494d79c7dadf5a541adff3d2cc79bf81e7800ffef09e"
+    },
+    "convex-billing": {
+      "source": "convex/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/convex-billing/SKILL.md",
+      "computedHash": "577a47a1c401c3cef5b005ac3f9fe86e09823e3d5daccfc64b85c13f34f4f611"
+    },
+    "convex-cost": {
+      "source": "convex/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/convex-cost/SKILL.md",
+      "computedHash": "0d95f007b77812f71507d0eddaf16fd93f6c84cd47a1428ae329b2931b659b2d"
+    },
+    "convex-create-component": {
+      "source": "convex/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/convex-create-component/SKILL.md",
+      "computedHash": "641d2904a3aab8edacb11ef51c7bcf8a64b304d3f4e6a2ea040c5355f9333c37"
+    },
+    "convex-crons": {
+      "source": "convex/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/convex-crons/SKILL.md",
+      "computedHash": "d7b9f33e21a85a9414b1d574b854f9d4caa624866451cfacf5fdf5cc87dec042"
+    },
+    "convex-deploy-guard": {
+      "source": "convex/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/convex-deploy-guard/SKILL.md",
+      "computedHash": "1e808b52cb21fb4f7ea3d0455591c71d8ee8070825a4201fdf6a26b09c8b50f3"
+    },
+    "convex-design": {
+      "source": "convex/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/convex-design/SKILL.md",
+      "computedHash": "3eeadb195c11fb1bf5f35ec42592487f697f5b9bde6582386d9daf9ba10d4d14"
+    },
+    "convex-docs": {
+      "source": "convex/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/convex-docs/SKILL.md",
+      "computedHash": "dab00143b5782f5c6a83fe88f64740816ef6b374e1309d5197e36b7017459e04"
+    },
+    "convex-domains": {
+      "source": "convex/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/convex-domains/SKILL.md",
+      "computedHash": "3dd5a6ca588ec3baa55a6e3fad204cf600e3b632f76ca13f460a13864a9412ba"
+    },
+    "convex-env": {
+      "source": "convex/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/convex-env/SKILL.md",
+      "computedHash": "c32111eb403409a100bd3702a95f1febf2e551cb73e936cf981255d5d57c7af7"
+    },
+    "convex-expert": {
+      "source": "convex/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/convex-expert/SKILL.md",
+      "computedHash": "5f1437f333902dcc030a1c9d8a46fe0b4a82741a36cfdb527120ea895359ec0a"
+    },
+    "convex-explain-app": {
+      "source": "convex/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/convex-explain-app/SKILL.md",
+      "computedHash": "e12915e724da729a086ea459125fd3a2223446e55dc22c6d0c89396a2854bff6"
+    },
+    "convex-improve-convex-plugin": {
+      "source": "convex/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/convex-improve-convex-plugin/SKILL.md",
+      "computedHash": "5933b9b20f3ea687418a5761f2905fccf669402f41d676c104a8804d696231b3"
+    },
+    "convex-insights": {
+      "source": "convex/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/convex-insights/SKILL.md",
+      "computedHash": "3965c57682c49b52117d230aa00d09e91656adec5458702aa9bdc549110de953"
+    },
+    "convex-launch-readiness": {
+      "source": "convex/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/convex-launch-readiness/SKILL.md",
+      "computedHash": "41f154d7a566858590f66bdfbbcafcb3448a95a85a9eb60ac19ffa509f374bce"
+    },
+    "convex-migrate": {
+      "source": "convex/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/convex-migrate/SKILL.md",
+      "computedHash": "46b2bf9a2b77463176fff1c0cacc7b3adfc3887c9a59d58d4654293760559307"
+    },
+    "convex-migrate-rehearse": {
+      "source": "convex/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/convex-migrate-rehearse/SKILL.md",
+      "computedHash": "716936a153f4dd46983aeb8d68428ff7d81e2ecd5fd4d3d08ac0892e01e70c57"
+    },
+    "convex-monitor": {
+      "source": "convex/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/convex-monitor/SKILL.md",
+      "computedHash": "8d371c2ef9932765f82c3cdb2c8e2fff2575cf1c836ecf4b0e3c42cb48e7128d"
+    },
+    "convex-optimize": {
+      "source": "convex/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/convex-optimize/SKILL.md",
+      "computedHash": "cbfb09fc5e0f4f3985f42c2b0eafc3c760827335d6e256cb2ded2e4677f93c92"
+    },
+    "convex-quickstart": {
+      "source": "convex/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/convex-quickstart/SKILL.md",
+      "computedHash": "b1433c157ae613a5583fed0546dca236cb96b5b48e0effee486ecc95baa6bf5b"
+    },
+    "convex-reviewer": {
+      "source": "convex/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/convex-reviewer/SKILL.md",
+      "computedHash": "a1875e2ec2982f65400ac96625c2dbd19d9cd3523dfc4140d782d97466413670"
+    },
+    "convex-seed": {
+      "source": "convex/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/convex-seed/SKILL.md",
+      "computedHash": "db302ed9c754bb5a0ab7d40fbfd863040e6c5714a14cee9c55eadf5cee252b16"
+    },
+    "convex-self-heal": {
+      "source": "convex/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/convex-self-heal/SKILL.md",
+      "computedHash": "21242c9185a3524a085537be21fa1b4707b5f02ce56a8d25b2232a99ecff224f"
+    },
+    "convex-sentinel": {
+      "source": "convex/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/convex-sentinel/SKILL.md",
+      "computedHash": "fe0a77acec7c826ebf187774b7d07cd92b69ffa79207170f57a7c1dd5163119b"
+    },
+    "convex-suggest": {
+      "source": "convex/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/convex-suggest/SKILL.md",
+      "computedHash": "3df027bda7e0628d99f6bd9e9f9f68a753ac7922c628fc291a31f17996ee5b05"
+    },
+    "convex-test": {
+      "source": "convex/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/convex-test/SKILL.md",
+      "computedHash": "8d782d8ad6f6e43d85e8fb9966a01d49bd007451f950108894a64b1e7da2fceb"
+    },
+    "convex-verify": {
+      "source": "convex/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/convex-verify/SKILL.md",
+      "computedHash": "dbe65a37ca2e9a5afa55669b8928ce1dc3ac765151452008f9105bde049228f7"
+    },
+    "emil-design-eng": {
+      "source": "emilkowalski/skill",
+      "sourceType": "github",
+      "skillPath": "skills/emil-design-eng/SKILL.md",
+      "computedHash": "2483020b5bbaab030d6b3463bfba49c8d9c2cd8dea4d9fba836dbd471f1fb706"
+    },
+    "find-animation-opportunities": {
+      "source": "emilkowalski/skill",
+      "sourceType": "github",
+      "skillPath": "skills/find-animation-opportunities/SKILL.md",
+      "computedHash": "465d087c41768e4f14ed640dd049036009f613feb55baaa5831b68b33178f9d2"
+    },
+    "improve-animations": {
+      "source": "emilkowalski/skill",
+      "sourceType": "github",
+      "skillPath": "skills/improve-animations/SKILL.md",
+      "computedHash": "f6652a3bb94950baa33c684cc0966c838eb65cf22ebb5769a4f51ea205c254fe"
+    },
+    "migrate-radix-to-base": {
+      "source": "shadcn/ui",
+      "sourceType": "github",
+      "skillPath": "skills/migrate-radix-to-base/SKILL.md",
+      "computedHash": "e1f2030ee5059be3dff0812ca0e4b995ee9fa3132176f049ebe6c90346a6755e"
+    },
+    "mobile-native": {
+      "source": "emilkowalski/skill",
+      "sourceType": "github",
+      "skillPath": "skills/mobile-native/SKILL.md",
+      "computedHash": "f221cea36642168df6d3d6d7f236237cbf1ae669138ff7df07775674223d49ad"
+    },
+    "pick-ui-library": {
+      "source": "emilkowalski/skill",
+      "sourceType": "github",
+      "skillPath": "skills/pick-ui-library/SKILL.md",
+      "computedHash": "5d2a77bf0ecafbda85aa95fb49999b6d77945d9066ec83d970b62e5b388cd686"
+    },
+    "prototype": {
+      "source": "emilkowalski/skill",
+      "sourceType": "github",
+      "skillPath": "skills/prototype/SKILL.md",
+      "computedHash": "77be567d8c946608fdd15e61b62ab383cdf289a194dce2479828b7eda860d3ba"
+    },
+    "remove-animations": {
+      "source": "emilkowalski/skill",
+      "sourceType": "github",
+      "skillPath": "skills/remove-animations/SKILL.md",
+      "computedHash": "5d738305c722c25e054a9e3b67e68d4429617d9fbae4bc8861b73cc25c8ba84c"
+    },
+    "review-animations": {
+      "source": "emilkowalski/skill",
+      "sourceType": "github",
+      "skillPath": "skills/review-animations/SKILL.md",
+      "computedHash": "b1aca2c16876b8f00e2a1eb161714e63ec41099269d5f95c2f307230749b9dcd"
+    },
+    "shadcn": {
+      "source": "shadcn/ui",
+      "sourceType": "github",
+      "skillPath": "skills/shadcn/SKILL.md",
+      "computedHash": "b864a958765563321f485a96f4d59c0bb6539f4286ab6d8b8b66895b7ebd302d"
+    },
+    "write-swift": {
+      "source": "emilkowalski/skill",
+      "sourceType": "github",
+      "skillPath": "skills/write-swift/SKILL.md",
+      "computedHash": "f20bb9cf51dbee1900b264820a12f1d3d378dc4d23ac758e7ba9e644c49a2459"
+    }
+  }
+}
