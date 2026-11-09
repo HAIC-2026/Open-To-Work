@@ -90,6 +90,24 @@ export const remove = mutation({
   },
 })
 
+export const rename = mutation({
+  args: {
+    id: v.id("folders"),
+    name: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const folder = await ctx.db.get(args.id)
+    if (!folder) {
+      throw new Error("Folder not found")
+    }
+    await ctx.db.patch(args.id, {
+      name: args.name.trim(),
+    })
+    return null
+  },
+})
+
 export const initDefaults = mutation({
   args: {},
   returns: v.boolean(),

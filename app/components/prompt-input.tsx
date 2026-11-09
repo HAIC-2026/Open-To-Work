@@ -9,7 +9,12 @@ import {
   PaperclipIcon,
   TelescopeIcon,
   GlobeIcon,
+  Folder,
+  Check,
 } from "lucide-react"
+import { useQuery } from "convex/react"
+import { api } from "@/convex/_generated/api"
+import type { Id } from "@/convex/_generated/dataModel"
 import { Spinner } from "@/components/ui/spinner"
 import { cn } from "cn"
 
@@ -22,7 +27,9 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
@@ -52,11 +59,14 @@ const SENATE_DISTRICTS = Array.from(
 )
 
 export interface PromptInputProps {
-  onSubmit?: (prompt: string, district?: string) => void
+  onSubmit?: (prompt: string, district?: string, folderId?: Id<"folders">) => void
   placeholder?: string
   isLoading?: boolean
   disabled?: boolean
   className?: string
+  showFolderSelect?: boolean
+  selectedFolderId?: Id<"folders">
+  onFolderChange?: (folderId?: Id<"folders">) => void
 }
 
 export function PromptInput({
@@ -65,10 +75,28 @@ export function PromptInput({
   isLoading = false,
   disabled = false,
   className,
+  showFolderSelect = false,
+  selectedFolderId: selectedFolderIdProp,
+  onFolderChange,
 }: PromptInputProps) {
   const [text, setText] = React.useState("")
   const [selectedDistrict, setSelectedDistrict] = React.useState("House District 1")
   const [districtOpen, setDistrictOpen] = React.useState(false)
+
+  const projectFolders = useQuery(api.folders.listWithConversations)
+  const [internalFolderId, setInternalFolderId] = React.useState<Id<"folders"> | undefined>(selectedFolderIdProp)
+
+  React.useEffect(() => {
+    setInternalFolderId(selectedFolderIdProp)
+  }, [selectedFolderIdProp])
+
+  const currentFolderId = selectedFolderIdProp !== undefined ? selectedFolderIdProp : internalFolderId
+  const handleSelectFolder = (id?: Id<"folders">) => {
+    setInternalFolderId(id)
+    onFolderChange?.(id)
+  }
+
+  const selectedFolder = projectFolders?.find((f) => f._id === currentFolderId)
 
   const formRef = React.useRef<HTMLFormElement>(null)
   const inputRef = React.useRef<HTMLInputElement>(null)
@@ -78,7 +106,7 @@ export function PromptInput({
   const onSubmit = (event: React.FormEvent) => {
     event.preventDefault()
     if (!canSend) return
-    onSubmitProp?.(text, selectedDistrict)
+    onSubmitProp?.(text, selectedDistrict, currentFolderId)
     setText("")
   }
 
@@ -143,6 +171,67 @@ export function PromptInput({
           <div className="flex items-center gap-2">
             {/* The pair of buttons */}
             <div className="flex items-center gap-1.5">
+              {/* Folder Selector Dropdown (to the left of the district dropdown) */}
+              {showFolderSelect && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={
+                      <InputGroupButton
+                        size="sm"
+                        variant="outline"
+                        className="h-8 gap-1.5 rounded-full px-3 text-xs font-normal max-w-[170px]"
+                        title={selectedFolder ? `Folder: ${selectedFolder.name}` : "Select folder"}
+                      />
+                    }
+                  >
+                    <Folder className={cn("size-3.5 shrink-0", selectedFolder ? "text-primary" : "opacity-60")} />
+                    <span className="truncate max-w-[100px]">
+                      {selectedFolder ? selectedFolder.name : "Select folder"}
+                    </span>
+                    <ChevronDown className="size-3 opacity-60 shrink-0" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-56" align="end" side="top" sideOffset={8}>
+                    <DropdownMenuGroup>
+                      <DropdownMenuLabel className="text-xs text-muted-foreground font-normal px-2 py-1.5">
+                        Save to Project Folder
+                      </DropdownMenuLabel>
+                      <DropdownMenuItem
+                        onClick={() => handleSelectFolder(undefined)}
+                        className="flex items-center gap-2 cursor-pointer"
+                      >
+                        <span className={cn("text-xs flex-1 truncate", !currentFolderId ? "font-semibold text-primary" : "text-muted-foreground")}>
+                          No folder (Recents)
+                        </span>
+                        {!currentFolderId && <Check className="ml-auto size-3.5 text-primary" />}
+                      </DropdownMenuItem>
+                    </DropdownMenuGroup>
+                    {projectFolders && projectFolders.length > 0 && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuGroup>
+                          {projectFolders.map((f) => {
+                            const isSelected = currentFolderId === f._id
+                            return (
+                              <DropdownMenuItem
+                                key={f._id}
+                                onClick={() => handleSelectFolder(f._id)}
+                                className="flex items-center gap-2 cursor-pointer"
+                              >
+                                <Folder className={cn("size-3.5 shrink-0", isSelected ? "text-primary" : "text-muted-foreground")} />
+                                <span className={cn("truncate text-xs flex-1", isSelected && "font-semibold text-foreground")}>
+                                  {f.name}
+                                </span>
+                                {isSelected && <Check className="ml-auto size-3.5 text-primary" />}
+                              </DropdownMenuItem>
+                            )
+                          })}
+                        </DropdownMenuGroup>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+
               {/* Button 1 (Left of pair): Searchable District Combobox */}
               <Popover open={districtOpen} onOpenChange={setDistrictOpen}>
                 <PopoverTrigger

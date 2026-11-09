@@ -19,6 +19,7 @@ import {
   Sun,
   Moon,
   Trash2,
+  Pencil,
 } from "lucide-react"
 
 import {
@@ -44,9 +45,11 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
+  SidebarMenuSubAction,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
   SidebarRail,
@@ -152,65 +155,61 @@ function DraggableFolderConversationItem({
         <span className="truncate">{conv.title}</span>
       </SidebarMenuSubButton>
 
-      {/* Action buttons (Pin, More) strictly appears on hover without lingering */}
-      <div
-        className="absolute right-1 top-0 h-8 flex items-center gap-1 opacity-0 group-hover/subitem:opacity-100 transition-opacity duration-150 group-data-[collapsible=icon]:hidden pointer-events-none group-hover/subitem:pointer-events-auto"
+      {/* Action buttons (Pin, More) using dedicated SidebarMenuSubAction primitives */}
+      <SidebarMenuSubAction
+        showOnHover
+        className={cn(
+          "size-7 right-9",
+          conv.isPinned && "md:opacity-100"
+        )}
+        title={conv.isPinned ? "Unpin conversation" : "Pin conversation"}
         onPointerDown={(e) => e.stopPropagation()}
-        onClick={(e) => e.stopPropagation()}
+        onClick={async (e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          await onTogglePin(conv._id)
+        }}
       >
-        <Button
-          variant="ghost"
-          size="icon"
-          type="button"
-          onClick={async (e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            await onTogglePin(conv._id)
-          }}
-          className="size-7 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-          title={conv.isPinned ? "Unpin conversation" : "Pin conversation"}
-        >
-          <Pin
-            className={cn(
-              "size-4",
-              conv.isPinned && "fill-current text-primary"
-            )}
-          />
-          <span className="sr-only">
-            {conv.isPinned ? "Unpin" : "Pin"}
-          </span>
-        </Button>
+        <Pin
+          className={cn(
+            "size-4",
+            conv.isPinned && "fill-current text-primary"
+          )}
+        />
+        <span className="sr-only">
+          {conv.isPinned ? "Unpin" : "Pin"}
+        </span>
+      </SidebarMenuSubAction>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button
-                variant="ghost"
-                size="icon"
-                type="button"
-                className="size-7 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                title="Conversation options"
-              />
-            }
-          >
-            <MoreVertical className="size-4" />
-            <span className="sr-only">Conversation options</span>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" side="right" sideOffset={4}>
-            <DropdownMenuItem
-              variant="destructive"
-              onClick={async (e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                await onDelete(conv._id, isActive)
-              }}
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <SidebarMenuSubAction
+              showOnHover
+              className="size-7 right-1"
+              title="Conversation options"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
             >
-              <Trash2 className="size-4" />
-              <span>Delete</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+              <MoreVertical className="size-4" />
+              <span className="sr-only">Conversation options</span>
+            </SidebarMenuSubAction>
+          }
+        />
+        <DropdownMenuContent align="end" side="right" sideOffset={4}>
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={async (e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              await onDelete(conv._id, isActive)
+            }}
+          >
+            <Trash2 className="size-4" />
+            <span>Delete</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </SidebarMenuSubItem>
   )
 }
@@ -235,7 +234,8 @@ interface DroppableFolderItemProps {
   activeConv: DraggedConversationData | null
   currentPathname: string
   onRemoveFolder: (id: Id<"folders">) => Promise<void>
-  onCreateConversationInFolder: (folderId: Id<"folders">) => Promise<void>
+  onStartRenameFolder: (folder: { id: Id<"folders">; name: string }) => void
+  onNavigateToNewWithFolder: (folderId: Id<"folders">) => void
   onTogglePin: (id: Id<"conversations">) => Promise<void>
   onDeleteConversation: (id: Id<"conversations">, isActive: boolean) => Promise<void>
 }
@@ -247,7 +247,8 @@ function DroppableFolderItem({
   activeConv,
   currentPathname,
   onRemoveFolder,
-  onCreateConversationInFolder,
+  onStartRenameFolder,
+  onNavigateToNewWithFolder,
   onTogglePin,
   onDeleteConversation,
 }: DroppableFolderItemProps) {
@@ -272,46 +273,54 @@ function DroppableFolderItem({
       <SidebarMenuItem
         ref={setNodeRef}
         className={cn(
-          "group/menu-item relative rounded-xl transition-[background-color,box-shadow] duration-150",
+          "relative rounded-xl transition-[background-color,box-shadow] duration-150",
           isDropTarget && "bg-sidebar-accent/80 ring-1 ring-primary/40 text-sidebar-accent-foreground"
         )}
       >
-        {/* Folder Trigger Button */}
-        <CollapsibleTrigger
-          render={
-            <SidebarMenuButton
-              tooltip={folder.name}
-              className="h-8 pr-16"
-            >
-              <Folder className="size-4 group-data-open/collapsible:hidden text-muted-foreground" />
-              <FolderOpen className="size-4 hidden group-data-open/collapsible:block text-primary" />
-              <span className="truncate">{folder.name}</span>
-            </SidebarMenuButton>
-          }
-        />
+        {/* Scoped Folder Header Row */}
+        <div className="group/folder-row relative">
+          {/* Folder Trigger Button */}
+          <CollapsibleTrigger
+            render={
+              <SidebarMenuButton
+                tooltip={folder.name}
+                className="h-8 pr-16"
+              >
+                <Folder className="size-4 group-data-open/collapsible:hidden text-muted-foreground" />
+                <FolderOpen className="size-4 hidden group-data-open/collapsible:block text-primary" />
+                <span className="truncate">{folder.name}</span>
+              </SidebarMenuButton>
+            }
+          />
 
-        {/* Pair of buttons for Folder: Fixed at h-8 top-0, strictly appears on mouse hover without lingering */}
-        <div
-          className="absolute right-1 top-0 h-8 flex items-center gap-1 opacity-0 group-hover/menu-item:opacity-100 transition-opacity duration-150 group-data-[collapsible=icon]:hidden pointer-events-none group-hover/menu-item:pointer-events-auto"
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
-        >
+          {/* Actions for Folder using dedicated SidebarMenuAction primitives */}
+          {/* 3-dots Menu Action (Rename, Delete) */}
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  type="button"
-                  className="size-7 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                <SidebarMenuAction
+                  showOnHover
+                  className="size-7 right-9 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-popup-open:opacity-100 group-hover/folder-row:opacity-100 group-has-[:focus-visible]/folder-row:opacity-100"
                   title="Folder options"
-                />
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MoreVertical className="size-4" />
+                  <span className="sr-only">Folder options</span>
+                </SidebarMenuAction>
               }
-            >
-              <MoreVertical className="size-4" />
-              <span className="sr-only">Folder options</span>
-            </DropdownMenuTrigger>
+            />
             <DropdownMenuContent align="end" side="right" sideOffset={4}>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  onStartRenameFolder({ id: folder._id, name: folder.name })
+                }}
+              >
+                <Pencil className="size-4" />
+                <span>Rename</span>
+              </DropdownMenuItem>
               <DropdownMenuItem
                 variant="destructive"
                 onClick={async (e) => {
@@ -321,26 +330,26 @@ function DroppableFolderItem({
                 }}
               >
                 <Trash2 className="size-4" />
-                <span>Delete Folder</span>
+                <span>Delete</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button
-            variant="ghost"
-            size="icon"
-            type="button"
-            onClick={async (e) => {
+          {/* Add conversation to folder action */}
+          <SidebarMenuAction
+            showOnHover
+            className="size-7 right-1 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-hover/folder-row:opacity-100 group-has-[:focus-visible]/folder-row:opacity-100"
+            title="Add to folder"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
               e.preventDefault()
               e.stopPropagation()
-              await onCreateConversationInFolder(folder._id)
+              onNavigateToNewWithFolder(folder._id)
             }}
-            className="size-7 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-            title="Add to folder"
           >
             <Plus className="size-4" />
             <span className="sr-only">Add to folder</span>
-          </Button>
+          </SidebarMenuAction>
         </div>
 
         {/* Nested Conversations Submenu */}
@@ -403,7 +412,7 @@ function DraggableRecentConversationItem({
     <SidebarMenuItem
       ref={setNodeRef}
       className={cn(
-        "group/menu-item relative select-none transition-opacity duration-150",
+        "group/recent-item relative select-none transition-opacity duration-150",
         isDragging && "opacity-35"
       )}
       {...attributes}
@@ -419,41 +428,36 @@ function DraggableRecentConversationItem({
         <span className="truncate">{conv.title}</span>
       </SidebarMenuButton>
 
-      <div
-        className="absolute right-1 top-0 h-8 flex items-center gap-1 opacity-0 group-hover/menu-item:opacity-100 transition-opacity duration-150 group-data-[collapsible=icon]:hidden pointer-events-none group-hover/menu-item:pointer-events-auto"
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button
-                variant="ghost"
-                size="icon"
-                type="button"
-                className="size-7 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                title="Conversation options"
-              />
-            }
-          >
-            <MoreVertical className="size-4" />
-            <span className="sr-only">Conversation options</span>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" side="right" sideOffset={4}>
-            <DropdownMenuItem
-              variant="destructive"
-              onClick={async (e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                await onDelete(conv._id, isActive)
-              }}
+      {/* Action using dedicated SidebarMenuAction */}
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <SidebarMenuAction
+              showOnHover
+              className="size-7 right-1 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-popup-open:opacity-100 group-hover/recent-item:opacity-100 group-has-[:focus-visible]/recent-item:opacity-100"
+              title="Conversation options"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
             >
-              <Trash2 className="size-4" />
-              <span>Delete</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+              <MoreVertical className="size-4" />
+              <span className="sr-only">Conversation options</span>
+            </SidebarMenuAction>
+          }
+        />
+        <DropdownMenuContent align="end" side="right" sideOffset={4}>
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={async (e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              await onDelete(conv._id, isActive)
+            }}
+          >
+            <Trash2 className="size-4" />
+            <span>Delete</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </SidebarMenuItem>
   )
 }
@@ -549,6 +553,7 @@ export function AppSidebar({
   const togglePin = useMutation(api.conversations.togglePin)
   const createFolder = useMutation(api.folders.create)
   const removeFolder = useMutation(api.folders.remove)
+  const renameFolder = useMutation(api.folders.rename)
   const initDefaults = useMutation(api.folders.initDefaults)
 
   const { theme, setTheme } = useTheme()
@@ -561,6 +566,11 @@ export function AppSidebar({
   const [createFolderOpen, setCreateFolderOpen] = React.useState(false)
   const [newFolderName, setNewFolderName] = React.useState("")
   const [isCreatingFolder, setIsCreatingFolder] = React.useState(false)
+
+  // Dialog state for renaming a project folder
+  const [renamingFolder, setRenamingFolder] = React.useState<{ id: Id<"folders">; name: string } | null>(null)
+  const [renameFolderName, setRenameFolderName] = React.useState("")
+  const [isRenamingFolder, setIsRenamingFolder] = React.useState(false)
 
   // Drag and Drop active item state
   const [activeConv, setActiveConv] = React.useState<DraggedConversationData | null>(null)
@@ -711,14 +721,9 @@ export function AppSidebar({
     }
   }
 
-  const handleCreateConversationInFolder = async (folderId: Id<"folders">) => {
-    const newId = await createConversation({
-      title: "New conversation",
-      district: currentUser.district,
-      folderId,
-    })
+  const handleNavigateToNewWithFolder = (folderId: Id<"folders">) => {
     setFolderOpen(folderId, true)
-    router.push(`/conversations/${newId}`)
+    router.push(`/new?folderId=${folderId}`)
   }
 
   return (
@@ -826,7 +831,11 @@ export function AppSidebar({
                         onRemoveFolder={async (id) => {
                           await removeFolder({ id })
                         }}
-                        onCreateConversationInFolder={handleCreateConversationInFolder}
+                        onStartRenameFolder={(folderToRename) => {
+                          setRenamingFolder(folderToRename)
+                          setRenameFolderName(folderToRename.name)
+                        }}
+                        onNavigateToNewWithFolder={handleNavigateToNewWithFolder}
                         onTogglePin={async (id) => {
                           await togglePin({ id })
                         }}
@@ -1042,6 +1051,78 @@ export function AppSidebar({
                 disabled={!newFolderName.trim() || isCreatingFolder}
               >
                 Create Folder
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog to rename a project folder */}
+      <Dialog
+        open={renamingFolder !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRenamingFolder(null)
+            setRenameFolderName("")
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Rename Folder</DialogTitle>
+            <DialogDescription>
+              Enter a new name for this project folder.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault()
+              if (!renamingFolder) return
+              const trimmed = renameFolderName.trim()
+              if (!trimmed) return
+              setIsRenamingFolder(true)
+              try {
+                await renameFolder({ id: renamingFolder.id, name: trimmed })
+                setRenamingFolder(null)
+                setRenameFolderName("")
+              } catch (err) {
+                console.error("Failed to rename folder", err)
+              } finally {
+                setIsRenamingFolder(false)
+              }
+            }}
+            className="flex flex-col gap-4"
+          >
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="rename-project-folder-name">Folder Name</FieldLabel>
+                <Input
+                  id="rename-project-folder-name"
+                  placeholder="e.g. Housing & Infrastructure"
+                  value={renameFolderName}
+                  onChange={(e) => setRenameFolderName(e.target.value)}
+                  disabled={isRenamingFolder}
+                  autoFocus
+                />
+              </Field>
+            </FieldGroup>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setRenamingFolder(null)
+                  setRenameFolderName("")
+                }}
+                disabled={isRenamingFolder}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={!renameFolderName.trim() || isRenamingFolder}
+              >
+                Save
               </Button>
             </DialogFooter>
           </form>

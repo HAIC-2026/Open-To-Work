@@ -1,25 +1,38 @@
 "use client"
 
 import * as React from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useMutation } from "convex/react"
 import { api } from "@/convex/_generated/api"
+import type { Id } from "@/convex/_generated/dataModel"
 import { PromptInput } from "@/components/prompt-input"
 import { Button } from "@/components/ui/button"
 import { Search, Building2, TrendingDown, HeartHandshake } from "lucide-react"
 
-export default function NewPage() {
+function NewPageContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const folderIdParam = searchParams.get("folderId") as Id<"folders"> | null
+
   const createConversation = useMutation(api.conversations.create)
   const [isSubmitting, setIsSubmitting] = React.useState(false)
 
-  const handleSubmit = async (prompt: string, district?: string) => {
+  const [selectedFolderId, setSelectedFolderId] = React.useState<Id<"folders"> | undefined>(
+    folderIdParam ?? undefined
+  )
+
+  React.useEffect(() => {
+    setSelectedFolderId(folderIdParam ?? undefined)
+  }, [folderIdParam])
+
+  const handleSubmit = async (prompt: string, district?: string, folderId?: Id<"folders">) => {
     if (!prompt.trim() || isSubmitting) return
     try {
       setIsSubmitting(true)
       const conversationId = await createConversation({
         title: prompt.trim(),
         district: district,
+        folderId: folderId,
       })
       router.push(`/conversations/${conversationId}`)
     } catch (error) {
@@ -42,7 +55,13 @@ export default function NewPage() {
 
         {/* Prompt input container */}
         <div className="w-full">
-          <PromptInput onSubmit={handleSubmit} isLoading={isSubmitting} />
+          <PromptInput
+            onSubmit={handleSubmit}
+            isLoading={isSubmitting}
+            showFolderSelect={true}
+            selectedFolderId={selectedFolderId}
+            onFolderChange={setSelectedFolderId}
+          />
         </div>
 
         {/* Three buttons grouped and centered below prompt input (larger size) */}
@@ -84,5 +103,13 @@ export default function NewPage() {
         <div className="size-full bg-accent-foreground/15 dark:bg-accent-foreground/20 [mask-image:url('/new-page-pattern.svg')] [-webkit-mask-image:url('/new-page-pattern.svg')] [mask-repeat:repeat-x] [-webkit-mask-repeat:repeat-x] [mask-position:bottom_center] [-webkit-mask-position:bottom_center] [mask-size:contain] [-webkit-mask-size:contain]" />
       </div>
     </div>
+  )
+}
+
+export default function NewPage() {
+  return (
+    <React.Suspense fallback={null}>
+      <NewPageContent />
+    </React.Suspense>
   )
 }
