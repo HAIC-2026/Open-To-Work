@@ -11,6 +11,7 @@ import {
   GlobeIcon,
   Folder,
   Check,
+  Square,
 } from "lucide-react"
 import { useQuery } from "convex/react"
 import { api } from "@/convex/_generated/api"
@@ -61,6 +62,7 @@ const SENATE_DISTRICTS = Array.from(
 
 export interface PromptInputProps {
   onSubmit?: (prompt: string, district?: string, folderId?: Id<"folders">) => void
+  onStop?: () => void
   placeholder?: string
   isLoading?: boolean
   disabled?: boolean
@@ -72,6 +74,7 @@ export interface PromptInputProps {
 
 export function PromptInput({
   onSubmit: onSubmitProp,
+  onStop,
   placeholder = "Ask about this district...",
   isLoading = false,
   disabled = false,
@@ -321,17 +324,35 @@ export function PromptInput({
               </InputGroupButton>
             </div>
 
-            {/* Send Button */}
-            <InputGroupButton
-              type="submit"
-              size="icon-sm"
-              variant="default"
-              className="rounded-full"
-              disabled={!canSend || isLoading || disabled}
-              aria-label="Send"
-            >
-              {isLoading ? <Spinner /> : <ArrowUpIcon />}
-            </InputGroupButton>
+            {/* Send or Stop Button */}
+            {isLoading && onStop ? (
+              <InputGroupButton
+                type="button"
+                size="icon-sm"
+                variant="default"
+                className="rounded-full bg-foreground text-background hover:bg-foreground/90 transition-all cursor-pointer shadow-sm"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  onStop()
+                }}
+                aria-label="Stop generation"
+                title="Stop generation"
+              >
+                <Square className="size-3 fill-current" />
+              </InputGroupButton>
+            ) : (
+              <InputGroupButton
+                type="submit"
+                size="icon-sm"
+                variant="default"
+                className="rounded-full"
+                disabled={!canSend || isLoading || disabled}
+                aria-label="Send"
+              >
+                {isLoading ? <Spinner /> : <ArrowUpIcon />}
+              </InputGroupButton>
+            )}
           </div>
         </InputGroupAddon>
       </InputGroup>

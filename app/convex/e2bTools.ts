@@ -57,12 +57,29 @@ export const executePython = createTool({
         "You cannot do any pip install in the sandbox environment. Pre-installed libraries (pandas, numpy, scipy, scikit-learn, requests, openpyxl, xlrd, etc.) are available to import directly. Print all results using print()."
       ),
   }),
-  execute: async (ctx: ToolCtx, args) => {
+  execute: async (ctx: ToolCtx, args, options?: any) => {
+    if (options?.abortSignal?.aborted) {
+      return {
+        exitCode: 1,
+        stdout: "",
+        stderr: "Execution aborted by user",
+        success: false,
+      };
+    }
+
     const identity = { scope: "hawaii", key: ctx.threadId || "default" };
 
     try {
       return await runScriptInSandbox(ctx, identity, args.code);
     } catch (firstErr: any) {
+      if (options?.abortSignal?.aborted) {
+        return {
+          exitCode: 1,
+          stdout: "",
+          stderr: "Execution aborted by user",
+          success: false,
+        };
+      }
       console.warn(
         "E2B execution failed on first attempt; auto-purging sandbox and retrying:",
         firstErr?.message || firstErr

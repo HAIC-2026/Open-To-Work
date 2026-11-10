@@ -116,7 +116,7 @@ export function AgentTrace({
       (!p.output && !p.error && !p.errorText && !p.result)
   )
 
-  const activeThinking = Boolean(isThinking || hasActiveTool)
+  const activeThinking = Boolean(isThinking && (isThinking || hasActiveTool))
 
   // Track expansion state: auto-expanded while thinking, auto-collapsed when done.
   // All hooks must be called unconditionally at the top level before any early return.
@@ -177,11 +177,14 @@ export function AgentTrace({
               const meta = getToolMeta(rawToolName)
               const IconComponent = meta.icon
 
-              const isRunning =
+              const isToolPending =
                 part.state === "input-streaming" ||
                 part.state === "input-available" ||
                 part.state === "call" ||
                 (!part.output && !part.error && !part.errorText && !part.result)
+
+              const isRunning = Boolean(isThinking && isToolPending)
+              const isInterrupted = Boolean(!isThinking && isToolPending)
 
               const isError =
                 part.state === "output-error" ||
@@ -202,6 +205,8 @@ export function AgentTrace({
               // Dynamic step label
               let title = isRunning
                 ? meta.runningText
+                : isInterrupted
+                ? `${meta.runningText.replace(/\.\.\.$/, "")} (halted)`
                 : isError
                 ? meta.errorText
                 : meta.doneText
@@ -209,6 +214,8 @@ export function AgentTrace({
               if (rawToolName === "search_datasets" && input.query) {
                 title = isRunning
                   ? `Searching Hawaii data for "${input.query}"...`
+                  : isInterrupted
+                  ? `Searched Hawaii data for "${input.query}" (halted)`
                   : output?.results?.length != null
                   ? `Found ${output.results.length} Hawaii datasets for "${input.query}"`
                   : `Searched Hawaii data for "${input.query}"`
@@ -216,6 +223,8 @@ export function AgentTrace({
                 const dsId = input.datasetId || input.id
                 title = isRunning
                   ? `Inspecting schema for ${dsId}...`
+                  : isInterrupted
+                  ? `Inspecting schema for ${dsId} (halted)`
                   : `Loaded schema for ${dsId}`
               }
 
@@ -232,7 +241,11 @@ export function AgentTrace({
                   </TraceIcon>
                   <TraceTitle>{title}</TraceTitle>
                   {!isRunning && (
-                    activeThinking ? (
+                    isInterrupted ? (
+                      <TraceDescription>
+                        Halted
+                      </TraceDescription>
+                    ) : activeThinking ? (
                       <TraceDescription>
                         {isError ? "Error" : "Done"}
                       </TraceDescription>
@@ -245,8 +258,8 @@ export function AgentTrace({
                 </TraceLine>
               )
 
-              // While running without output, render as shimmer line
-              if (isRunning && !output) {
+              // While running or halted without output, render as plain non-collapsible line
+              if ((isRunning || isInterrupted) && !output) {
                 return (
                   <React.Fragment key={part.toolCallId || index}>
                     {line}

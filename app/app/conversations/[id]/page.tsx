@@ -181,6 +181,22 @@ export default function ConversationPage({
     }
   )
   const resubmitMessageMutation = useMutation(api.chat.resubmitMessage)
+  const stopThinkingMutation = useMutation(api.chat.stopThinking)
+  const [isHalting, setIsHalting] = React.useState(false)
+
+  const handleStopThinking = async () => {
+    if (!conversation || isHalting) return
+    try {
+      setIsHalting(true)
+      await stopThinkingMutation({
+        conversationId: conversation._id,
+      })
+    } catch (err) {
+      console.error("Failed to stop thinking:", err)
+    } finally {
+      setIsHalting(false)
+    }
+  }
 
   const messages = React.useMemo(() => {
     if (threadId) {
@@ -439,9 +455,9 @@ export default function ConversationPage({
                       }
 
                       // Assistant Turn
-                      const isStreaming = message.status === "streaming"
+                      const isStreaming = isThinking && message.status === "streaming"
                       const isPending =
-                        message.status === "pending" || (isStreaming && !message.content)
+                        isThinking && (message.status === "pending" || (isStreaming && !message.content))
                       const isLastAssistantMessage = index === messages.length - 1
                       const isMessageThinking = isStreaming || isPending || (isThinking && isLastAssistantMessage)
 
@@ -478,8 +494,12 @@ export default function ConversationPage({
                                   <Spinner className="size-4 animate-spin text-muted-foreground" />
                                   <span>Formulating response...</span>
                                 </div>
+                              ) : !isThinking && (message.status === "failed" || !message.content) ? (
+                                <div className="text-xs text-muted-foreground italic py-1">
+                                  Thinking process halted.
+                                </div>
                               ) : null}
-                              {!isPending && (
+                              {!isPending && Boolean(message.content) && (
                                 <MessageFooter className="px-0">
                                   <MessageAction
                                     label={copiedId === message._id ? "Copied" : "Copy"}
@@ -511,7 +531,8 @@ export default function ConversationPage({
               <PromptInput
                 placeholder={isThinking ? "Assistant is thinking..." : "Ask about this district..."}
                 onSubmit={handleSendMessage}
-                isLoading={isSubmitting || isThinking}
+                onStop={handleStopThinking}
+                isLoading={isSubmitting || isThinking || isHalting}
                 disabled={isThinking}
                 className="shadow-lg"
               />

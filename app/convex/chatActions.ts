@@ -1,9 +1,9 @@
 "use node";
 
 import { internalAction } from "./_generated/server";
-import { components, internal } from "./_generated/api";
+import { components, internal, api } from "./_generated/api";
 import { v } from "convex/values";
-import { Agent, listUIMessages } from "@convex-dev/agent";
+import { Agent, listUIMessages, listStreams } from "@convex-dev/agent";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateText } from "ai";
 import { searchDatasets, getDatasetDetails, exploreDataSources } from "./datatrove";
@@ -170,7 +170,34 @@ export const streamResponse = internalAction({
       );
 
       // If all turns were consumed by tools and no text was produced, force synthesis using generateText
-      const fullText = await result.text;
+      let fullText = "";
+      try {
+        fullText = await result.text;
+      } catch (err: any) {
+        // If aborted or failed mid-stream, result.text will reject
+        console.log("Stream text aborted or finished with error:", err?.message || err);
+        return;
+      }
+
+      // Safeguard: verify stream was not aborted before running fallback synthesis
+      const abortedStreams = await listStreams(ctx, components.agent, {
+        threadId: args.threadId,
+        includeStatuses: ["aborted"],
+      });
+      if (abortedStreams.length > 0) {
+        console.log("Stream was aborted; skipping fallback synthesis.");
+        return;
+      }
+
+      // Safeguard: verify conversation is still marked as thinking
+      if (args.conversationId) {
+        const conv = await ctx.runQuery(api.conversations.get, { id: args.conversationId });
+        if (!conv || conv.thinking === false) {
+          console.log("Conversation thinking was halted; skipping fallback synthesis.");
+          return;
+        }
+      }
+
       if (!fullText || fullText.trim().length === 0) {
         const uiMessages = await listUIMessages(ctx, components.agent, {
           threadId: args.threadId,

@@ -36,7 +36,7 @@ export const searchDatasets = createTool({
       .optional()
       .describe("Maximum number of results to return (default 5, max 15)"),
   }),
-  execute: async (_ctx, args) => {
+  execute: async (_ctx, args, options?: any) => {
     try {
       const params = new URLSearchParams({
         q: args.query,
@@ -52,6 +52,7 @@ export const searchDatasets = createTool({
           Accept: "application/json",
           "X-Dt-State": "US-HI",
         },
+        signal: options?.abortSignal,
       });
 
       if (!res.ok) {
@@ -113,13 +114,14 @@ export const getDatasetDetails = createTool({
       .optional()
       .describe("Whether to include the full column fields list (default true)"),
   }),
-  execute: async (_ctx, args) => {
+  execute: async (_ctx, args, options?: any) => {
     try {
       const res = await fetch(`${API_URL}/api/dataset/${encodeURIComponent(args.datasetId)}`, {
         headers: {
           Accept: "application/json",
           "X-Dt-State": "US-HI",
         },
+        signal: options?.abortSignal,
       });
 
       if (!res.ok) {
@@ -186,7 +188,7 @@ export const exploreDataSources = createTool({
         "Agency identifier (required if action is 'get_source_datasets', e.g. 'honolulu_dpp', 'heco', 'dbedt_warehouse', 'uhero')"
       ),
   }),
-  execute: async (_ctx, args) => {
+  execute: async (_ctx, args, options?: any) => {
     try {
       if (args.action === "list_all_sources") {
         const res = await fetch(`${API_URL}/api/sources?state=US-HI`, {
@@ -194,6 +196,7 @@ export const exploreDataSources = createTool({
             Accept: "application/json",
             "X-Dt-State": "US-HI",
           },
+          signal: options?.abortSignal,
         });
         if (!res.ok) return { error: `Failed to fetch sources: HTTP ${res.status}` };
         const data = await res.json();
@@ -222,6 +225,7 @@ export const exploreDataSources = createTool({
               Accept: "application/json",
               "X-Dt-State": "US-HI",
             },
+            signal: options?.abortSignal,
           }
         );
         if (!res.ok) {
