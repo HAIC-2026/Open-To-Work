@@ -9,6 +9,8 @@ import {
   createThread,
   saveMessage,
   saveMessages,
+  abortStream,
+  listStreams,
 } from "@convex-dev/agent";
 
 export const listThreadMessages = query({
@@ -256,6 +258,47 @@ export const resubmitMessage = mutation({
       district: conversation.district,
       userId: conversation.userId,
     });
+
+    return null;
+  },
+});
+
+export const stopThinking = mutation({
+  args: {
+    conversationId: v.id("conversations"),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const conversation = await ctx.db.get(args.conversationId);
+    if (!conversation) {
+      return null;
+    }
+
+    // 1. Immediately reset the thinking flag so UI reactivity unlocks input & sidebar
+    if (conversation.thinking) {
+      await ctx.db.patch(args.conversationId, { thinking: false });
+    }
+
+    // 2. Abort all active streams in the agent thread
+    if (conversation.threadId) {
+      const activeStreams = await listStreams(ctx, components.agent, {
+        threadId: conversation.threadId,
+        includeStatuses: ["streaming"],
+      });
+
+      for (const s of activeStreams) {
+        await abortStream(ctx, components.agent, {
+          streamId: s.streamId,
+          reason: "Halted by user",
+        });
+      }
+
+      // 3. Immediately trigger cleanup/termination of the E2B sandbox
+      await ctx.scheduler.runAfter(0, internal.chatActions.cleanupSandbox, {
+        userId: conversation.userId,
+        threadId: conversation.threadId,
+      });
+    }
 
     return null;
   },

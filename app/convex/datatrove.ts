@@ -36,7 +36,7 @@ export const searchDatasets = createTool({
       .optional()
       .describe("Maximum number of results to return (default 5, max 15)"),
   }),
-  execute: async (_ctx, args) => {
+  execute: async (_ctx, args, options?: any) => {
     try {
       const params = new URLSearchParams({
         q: args.query,
@@ -52,6 +52,7 @@ export const searchDatasets = createTool({
           Accept: "application/json",
           "X-Dt-State": "US-HI",
         },
+        signal: options?.abortSignal,
       });
 
       if (!res.ok) {
@@ -113,13 +114,14 @@ export const getDatasetDetails = createTool({
       .optional()
       .describe("Whether to include the full column fields list (default true)"),
   }),
-  execute: async (_ctx, args) => {
+  execute: async (_ctx, args, options?: any) => {
     try {
       const res = await fetch(`${API_URL}/api/dataset/${encodeURIComponent(args.datasetId)}`, {
         headers: {
           Accept: "application/json",
           "X-Dt-State": "US-HI",
         },
+        signal: options?.abortSignal,
       });
 
       if (!res.ok) {
@@ -186,7 +188,7 @@ export const exploreDataSources = createTool({
         "Agency identifier (required if action is 'get_source_datasets', e.g. 'honolulu_dpp', 'heco', 'dbedt_warehouse', 'uhero')"
       ),
   }),
-  execute: async (_ctx, args) => {
+  execute: async (_ctx, args, options?: any) => {
     try {
       if (args.action === "list_all_sources") {
         const res = await fetch(`${API_URL}/api/sources?state=US-HI`, {
@@ -194,6 +196,7 @@ export const exploreDataSources = createTool({
             Accept: "application/json",
             "X-Dt-State": "US-HI",
           },
+          signal: options?.abortSignal,
         });
         if (!res.ok) return { error: `Failed to fetch sources: HTTP ${res.status}` };
         const data = await res.json();
@@ -222,6 +225,7 @@ export const exploreDataSources = createTool({
               Accept: "application/json",
               "X-Dt-State": "US-HI",
             },
+            signal: options?.abortSignal,
           }
         );
         if (!res.ok) {
@@ -253,5 +257,96 @@ export const exploreDataSources = createTool({
         error: `Failed to explore data sources: ${err?.message || String(err)}`,
       };
     }
+  },
+});
+
+/**
+ * 4. Cite Hawaii Data Sources Tool
+ * Allows the agent to explicitly declare and register the exact sources and datasets
+ * that directly substantiated the facts, numbers, or tables in its response.
+ * Strictly requires the unique dataset 'id' from search_datasets and verifies it
+ * against Datatrove, preventing hallucinated external links or Wikipedia citations.
+ */
+export const citeSources = createTool({
+  description:
+    "Explicitly cite and register the exact Hawaii datasets from your previous search_datasets results that directly substantiated facts, calculations, or tables in your final answer. You MUST provide the exact dataset 'id' returned by search_datasets (e.g. 'databook-21.20', 'dbedt_warehouse-construction-and-housing-home-sales-and-prices-board-of-realtors-data', or 'geo_hi__adminbnd__hawaii-state-house-districts-2022'). You CANNOT invent external URLs, Wikipedia links, or cite datasets that were not returned by search_datasets.",
+  inputSchema: z.object({
+    sources: z
+      .array(
+        z.object({
+          datasetId: z
+            .string()
+            .describe(
+              "The exact unique dataset 'id' from search_datasets (e.g. 'databook-21.20', 'databook-13.26', 'geo_hi__adminbnd__hawaii-state-house-districts-2022'). Do NOT invent fake IDs or cite Wikipedia."
+            ),
+          reason: z
+            .string()
+            .describe(
+              "Brief 1-sentence note of what specific metric, calculation, or fact this dataset supplied"
+            ),
+        })
+      )
+      .describe(
+        "List of official Hawaii datasets that directly supplied data points or tables in the final answer."
+      ),
+  }),
+  execute: async (_ctx, args, options?: any) => {
+    const verifiedSources: any[] = [];
+    const rejectedSources: any[] = [];
+
+    await Promise.all(
+      args.sources.map(async (s) => {
+        const cleanId = (s.datasetId || "").trim();
+        if (!cleanId) return;
+
+        try {
+          const res = await fetch(`${API_URL}/api/dataset/${encodeURIComponent(cleanId)}`, {
+            headers: {
+              Accept: "application/json",
+              "X-Dt-State": "US-HI",
+            },
+            signal: options?.abortSignal,
+          });
+
+          if (!res.ok) {
+            rejectedSources.push({
+              datasetId: cleanId,
+              error: `Dataset ID '${cleanId}' was not found in the official State of Hawaii public catalog.`,
+            });
+            return;
+          }
+
+          const d = await res.json();
+          verifiedSources.push({
+            id: d.id,
+            datasetId: d.id,
+            title: d.title,
+            organization: d.organization,
+            source: d.source,
+            url: d.source_url || d.direct_download_url || `https://api.datatrove.ai/api/dataset/${d.id}`,
+            direct_download_url: d.direct_download_url,
+            reason: s.reason,
+            coverage:
+              d.start_year && d.end_year
+                ? `${d.start_year}–${d.end_year}`
+                : d.end_year
+                ? String(d.end_year)
+                : undefined,
+          });
+        } catch (err: any) {
+          rejectedSources.push({
+            datasetId: cleanId,
+            error: `Failed to verify dataset '${cleanId}': ${err?.message || String(err)}`,
+          });
+        }
+      })
+    );
+
+    return {
+      success: verifiedSources.length > 0,
+      count: verifiedSources.length,
+      sources: verifiedSources,
+      rejected: rejectedSources.length > 0 ? rejectedSources : undefined,
+    };
   },
 });
