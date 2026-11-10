@@ -14,7 +14,7 @@ const google = createGoogleGenerativeAI({
 });
 
 const THINKING_LEVEL = "high";
-const MAX_COUNT = 25;
+const MAX_COUNT = 30;
 const MAX_ERROR_ALLOWANCE = 10;
 const SYNTHESIS_STEP_THRESHOLD = Math.max(MAX_COUNT - 2, 1);
 

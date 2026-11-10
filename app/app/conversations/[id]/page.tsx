@@ -353,7 +353,7 @@ export default function ConversationPage({
                     aria-busy={isSubmitting}
                     className="gap-6 px-6 md:px-8 pt-6 pb-48 max-w-3xl mx-auto"
                   >
-                    {messages.map((message) => {
+                    {messages.map((message, index) => {
                       if (message.role === "user") {
                         const isEditing = editingId === message._id
                         return (
@@ -442,6 +442,8 @@ export default function ConversationPage({
                       const isStreaming = message.status === "streaming"
                       const isPending =
                         message.status === "pending" || (isStreaming && !message.content)
+                      const isLastAssistantMessage = index === messages.length - 1
+                      const isMessageThinking = isStreaming || isPending || (isThinking && isLastAssistantMessage)
 
                       return (
                         <MessageScrollerItem
@@ -452,7 +454,10 @@ export default function ConversationPage({
                           <Message>
                             <MessageContent className="gap-2 text-sm md:text-base leading-relaxed text-foreground">
                               {/* Real-time Agent Execution Trace (shadcn/ui AI Elements) */}
-                              <AgentTrace parts={(message as any).parts} />
+                              <AgentTrace
+                                parts={(message as any).parts}
+                                isThinking={isMessageThinking}
+                              />
 
                               {isPending && !(message as any).parts?.some((p: any) => p && ((typeof p.type === "string" && p.type.startsWith("tool-")) || p.type === "dynamic-tool" || p.toolName)) ? (
                                 <div className="flex items-center gap-2 text-muted-foreground text-sm py-1.5 animate-pulse">
