@@ -27,9 +27,11 @@ import {
   Building2,
   Terminal,
   ArrowUpRight,
+  Globe,
   Wrench,
   AlertCircle,
 } from "lucide-react"
+import { SourceFavicon } from "./sources"
 
 export interface ToolPartLike {
   type: string
@@ -74,6 +76,14 @@ function getToolMeta(toolName?: string) {
         runningText: "Exploring Hawaii public data sources...",
         doneText: "Explored Hawaii data sources",
         errorText: "Failed to load data sources",
+      }
+    case "cite_sources":
+      return {
+        icon: Globe,
+        label: "Source Attribution",
+        runningText: "Attributing used Hawaii data sources...",
+        doneText: "Attributed verified data sources",
+        errorText: "Failed to attribute data sources",
       }
     default:
       return {
@@ -226,6 +236,15 @@ export function AgentTrace({
                   : isInterrupted
                   ? `Inspecting schema for ${dsId} (halted)`
                   : `Loaded schema for ${dsId}`
+              } else if (rawToolName === "cite_sources") {
+                const count = output?.count ?? output?.sources?.length ?? input?.sources?.length
+                title = isRunning
+                  ? "Attributing used Hawaii data sources..."
+                  : isInterrupted
+                  ? "Attributed data sources (halted)"
+                  : count != null
+                  ? `Attributed ${count} verified ${count === 1 ? "source" : "sources"}`
+                  : "Attributed verified data sources"
               }
 
               const line = (
@@ -325,15 +344,18 @@ export function AgentTrace({
                             rel="noreferrer"
                             className="group/dataset flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs transition-colors hover:border-border hover:bg-muted/70"
                           >
-                            <div className="flex min-w-0 flex-col gap-0.5">
-                              <span className="truncate font-medium text-foreground group-hover/dataset:text-primary">
-                                {d.title}
-                              </span>
-                              <span className="truncate text-muted-foreground">
-                                {d.organization || d.source} • Coverage: {d.start_year || "?"}–{d.end_year || "?"}
-                              </span>
+                            <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                              <SourceFavicon url={d.source_url || d.direct_download_url} />
+                              <div className="flex min-w-0 flex-col gap-0.5">
+                                <span className="truncate font-medium text-foreground group-hover/dataset:text-primary">
+                                  {d.title}
+                                </span>
+                                <span className="truncate text-muted-foreground">
+                                  {d.organization || d.source} • Coverage: {d.start_year || "?"}–{d.end_year || "?"}
+                                </span>
+                              </div>
                             </div>
-                            <ArrowUpRight className="size-3.5 shrink-0 text-muted-foreground group-hover/dataset:text-primary" />
+                            <ArrowUpRight className="size-4 shrink-0 text-muted-foreground group-hover/dataset:text-primary transition-colors" />
                           </a>
                         ))}
                       </div>
@@ -364,10 +386,43 @@ export function AgentTrace({
                       </div>
                     )}
 
+                    {/* Source attribution presentation */}
+                    {rawToolName === "cite_sources" &&
+                      (output?.sources || input?.sources) &&
+                      Array.isArray(output?.sources || input?.sources) && (
+                        <div className="flex flex-col gap-1.5 pt-1">
+                          {(output?.sources || input?.sources).map((s: any, idx: number) => (
+                            <a
+                              key={s.datasetId || s.id || `${s.url || "source"}-${idx}`}
+                              href={s.url || s.direct_download_url || "#"}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="group/dataset flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs transition-colors hover:border-border hover:bg-muted/70"
+                            >
+                              <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                                <SourceFavicon url={s.url || s.direct_download_url} />
+                                <div className="flex min-w-0 flex-col gap-0.5">
+                                  <span className="truncate font-medium text-foreground group-hover/dataset:text-primary">
+                                    {s.title || s.datasetId}
+                                  </span>
+                                  {s.reason && (
+                                    <span className="truncate text-muted-foreground">
+                                      {s.reason}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <ArrowUpRight className="size-4 shrink-0 text-muted-foreground group-hover/dataset:text-primary transition-colors" />
+                            </a>
+                          ))}
+                        </div>
+                      )}
+
                     {/* Generic fallback presentation */}
                     {rawToolName !== "execute_python" &&
                       rawToolName !== "search_datasets" &&
                       rawToolName !== "get_dataset_details" &&
+                      rawToolName !== "cite_sources" &&
                       output && (
                         <CodeBlock size="sm">
                           <CodeBlockContent wrap className="max-h-60 font-mono text-xs">

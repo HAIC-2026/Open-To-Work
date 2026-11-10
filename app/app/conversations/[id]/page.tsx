@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { MarkdownRenderer } from "@/components/markdown-renderer"
 import { AgentTrace } from "@/components/agent-trace"
+import { Sources } from "@/components/sources"
 import {
   MessageScrollerProvider,
   MessageScroller,
@@ -499,6 +500,13 @@ export default function ConversationPage({
                                   Thinking process halted.
                                 </div>
                               ) : null}
+                              {/* Real-time Sources Trace (shadcn/ui AI Elements) */}
+                              {Boolean(message.content) && (
+                                <Sources
+                                  parts={(message as any).parts}
+                                  content={message.content}
+                                />
+                              )}
                               {!isPending && Boolean(message.content) && (
                                 <MessageFooter className="px-0">
                                   <MessageAction

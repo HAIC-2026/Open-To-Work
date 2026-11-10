@@ -6,7 +6,7 @@ import { v } from "convex/values";
 import { Agent, listUIMessages, listStreams } from "@convex-dev/agent";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateText } from "ai";
-import { searchDatasets, getDatasetDetails, exploreDataSources } from "./datatrove";
+import { searchDatasets, getDatasetDetails, exploreDataSources, citeSources } from "./datatrove";
 import { executePython, sandboxes } from "./e2bTools";
 
 const google = createGoogleGenerativeAI({
@@ -66,7 +66,8 @@ const BASE_INSTRUCTIONS =
   "- Use `search_datasets` to find official Hawaii datasets (DBEDT, Honolulu DPP, UHERO, HECO, PUC, DOH, DOTAX, DLIR, etc.) and obtain direct download URLs.\n" +
   "- Use `get_dataset_details` to inspect exact column schemas, data types, sample values, and data limitations/biases before analyzing.\n" +
   "- Use `explore_data_sources` to browse what Hawaii agencies publish.\n" +
-  "- Use `execute_python` to download datasets, perform numerical analysis, calculate growth rates/percentages/statistics, and verify findings.\n\n" +
+  "- Use `execute_python` to download datasets, perform numerical analysis, calculate growth rates/percentages/statistics, and verify findings.\n" +
+  "- Use `cite_sources` after finishing your data retrieval and Python calculations to declare the exact datasets that directly contributed facts, metrics, or tables to your final answer. You must supply the exact dataset 'id' returned by search_datasets (e.g. 'databook-21.20', 'geo_hi__adminbnd__hawaii-state-house-districts-2022'). You CANNOT cite external websites, Wikipedia, or datasets not found in search_datasets.\n\n" +
   "AVAILABLE PRE-INSTALLED PYTHON LIBRARIES:\n" +
   "The E2B sandbox environment has over 180 data science packages pre-installed. The following are available to import directly:\n" +
   "• Data & Tables: `pandas`, `numpy`, `openpyxl`, `xlrd`, `xarray`\n" +
@@ -109,6 +110,7 @@ export const assistantAgent = new Agent(components.agent, {
     get_dataset_details: getDatasetDetails,
     explore_data_sources: exploreDataSources,
     execute_python: executePython,
+    cite_sources: citeSources,
   },
   stopWhen: isProductiveLimitReached,
 });
@@ -165,7 +167,10 @@ export const streamResponse = internalAction({
           },
         },
         {
-          saveStreamDeltas: { chunking: "word" },
+          saveStreamDeltas: {
+            chunking: "word",
+            sendSources: true,
+          },
         }
       );
 
@@ -208,6 +213,14 @@ export const streamResponse = internalAction({
         const userMsg = uiMessages.page.find((m: any) => m.role === "user");
 
         const toolOutputs: string[] = [];
+        const fallbackSources: Array<{
+          sourceType: "url";
+          id: string;
+          url: string;
+          title?: string;
+        }> = [];
+        const seenUrls = new Set<string>();
+
         for (const rawPart of assistantMsg?.parts || []) {
           const p = rawPart as any;
           if (p.type?.startsWith("tool-") || p.toolName) {
@@ -215,6 +228,41 @@ export const streamResponse = internalAction({
             const stdout = p.output?.stdout || (p.output ? JSON.stringify(p.output) : "");
             if (stdout) {
               toolOutputs.push(`### Data from ${name}:\n${stdout.slice(0, 1000)}`);
+            }
+
+            // Extract official dataset URLs from tool results
+            if (p.type === "tool-cite_sources" || p.toolName === "cite_sources") {
+              const citedList = Array.isArray(p.output?.sources) ? p.output.sources : [];
+              for (const c of citedList) {
+                const url = c?.url || c?.direct_download_url;
+                if (url && typeof url === "string" && !seenUrls.has(url)) {
+                  seenUrls.add(url);
+                  fallbackSources.push({
+                    sourceType: "url",
+                    id: url,
+                    url,
+                    title: c.title,
+                  });
+                }
+              }
+            } else {
+              const results = Array.isArray(p.output?.results)
+                ? p.output.results
+                : p.output?.source_url
+                ? [p.output]
+                : [];
+              for (const r of results) {
+                const url = r?.source_url || r?.direct_download_url;
+                if (url && typeof url === "string" && !seenUrls.has(url)) {
+                  seenUrls.add(url);
+                  fallbackSources.push({
+                    sourceType: "url",
+                    id: url,
+                    url,
+                    title: r.title || r.name,
+                  });
+                }
+              }
             }
           }
         }
@@ -245,6 +293,7 @@ export const streamResponse = internalAction({
               role: "assistant",
               content: synthesizedText,
             },
+            ...(fallbackSources.length > 0 ? { metadata: { sources: fallbackSources } } : {}),
           });
         }
       }
