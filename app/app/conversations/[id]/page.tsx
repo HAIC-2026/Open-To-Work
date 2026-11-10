@@ -225,8 +225,10 @@ export default function ConversationPage({
     setEditDraft("")
   }
 
+  const isThinking = Boolean(conversation?.thinking)
+
   const handleResubmit = async (messageId: string) => {
-    if (!editDraft.trim() || isResubmitting || !conversation) return
+    if (!editDraft.trim() || isResubmitting || isThinking || !conversation) return
     try {
       setIsResubmitting(true)
       await resubmitMessageMutation({
@@ -244,7 +246,7 @@ export default function ConversationPage({
   }
 
   const handleSendMessage = async (content: string) => {
-    if (!content.trim() || isSubmitting || !conversation) return
+    if (!content.trim() || isSubmitting || isThinking || !conversation) return
     try {
       setIsSubmitting(true)
       await sendMessageMutation({
@@ -502,9 +504,10 @@ export default function ConversationPage({
           <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col bg-transparent pb-6 md:pb-8">
             <div className="pointer-events-auto mx-auto w-full max-w-3xl px-6 md:px-8">
               <PromptInput
-                placeholder="Ask about this district..."
+                placeholder={isThinking ? "Assistant is thinking..." : "Ask about this district..."}
                 onSubmit={handleSendMessage}
-                isLoading={isSubmitting}
+                isLoading={isSubmitting || isThinking}
+                disabled={isThinking}
                 className="shadow-lg"
               />
             </div>

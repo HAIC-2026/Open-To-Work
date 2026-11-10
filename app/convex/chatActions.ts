@@ -1,9 +1,9 @@
 "use node";
 
 import { internalAction } from "./_generated/server";
-import { components } from "./_generated/api";
+import { components, internal } from "./_generated/api";
 import { v } from "convex/values";
-import { Agent, stepCountIs, listUIMessages } from "@convex-dev/agent";
+import { Agent, listUIMessages } from "@convex-dev/agent";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateText } from "ai";
 import { searchDatasets, getDatasetDetails, exploreDataSources } from "./datatrove";
@@ -13,9 +13,51 @@ const google = createGoogleGenerativeAI({
   apiKey: process.env.GEMINI_API_KEY,
 });
 
-const THINKING_LEVEL = "high"
+const THINKING_LEVEL = "high";
 const MAX_COUNT = 15;
+const MAX_ERROR_ALLOWANCE = 10;
 const SYNTHESIS_STEP_THRESHOLD = Math.max(MAX_COUNT - 2, 1);
+
+/**
+ * Checks whether a single step in the agent execution loop resulted in a tool error.
+ * A tool step is an error if a tool threw an exception or execute_python returned success: false.
+ */
+export function isStepError(step: any): boolean {
+  return step?.toolResults?.some(
+    (tr: any) => tr.error || tr.output?.success === false
+  ) ?? false;
+}
+
+/**
+ * Calculates effective productive turns and error count.
+ * Errors up to MAX_ERROR_ALLOWANCE (10) are forgiven and do not count as a productive turn.
+ */
+export function calculateEffectiveStep(steps: any[]) {
+  const totalSteps = Array.isArray(steps) ? steps.length : 0;
+  const errorCount = Array.isArray(steps) ? steps.filter(isStepError).length : 0;
+  const forgivenErrors = Math.min(errorCount, MAX_ERROR_ALLOWANCE);
+  const effectiveTurns = totalSteps - forgivenErrors;
+  return {
+    totalSteps,
+    errorCount,
+    forgivenErrors,
+    effectiveTurns,
+  };
+}
+
+/**
+ * Custom StopCondition:
+ * Stops the agent loop when MAX_COUNT (15) productive turns are reached,
+ * allowing up to MAX_ERROR_ALLOWANCE (10) forgiven tool errors before halting.
+ * Guaranteed hard ceiling of (MAX_COUNT + MAX_ERROR_ALLOWANCE = 25) total steps.
+ */
+export function isProductiveLimitReached({ steps }: { steps: any[] }): boolean {
+  const { effectiveTurns, totalSteps } = calculateEffectiveStep(steps);
+  if (totalSteps >= MAX_COUNT + MAX_ERROR_ALLOWANCE) {
+    return true;
+  }
+  return effectiveTurns >= MAX_COUNT;
+}
 
 const BASE_INSTRUCTIONS =
   "You are an expert legislative and policy research assistant for the Hawaii State Legislature. " +
@@ -68,11 +110,12 @@ export const assistantAgent = new Agent(components.agent, {
     explore_data_sources: exploreDataSources,
     execute_python: executePython,
   },
-  stopWhen: stepCountIs(MAX_COUNT),
+  stopWhen: isProductiveLimitReached,
 });
 
 export const streamResponse = internalAction({
   args: {
+    conversationId: v.optional(v.id("conversations")),
     threadId: v.string(),
     promptMessageId: v.string(),
     district: v.optional(v.string()),
@@ -90,11 +133,32 @@ export const streamResponse = internalAction({
         {
           promptMessageId: args.promptMessageId,
           instructions,
-          prepareStep: async ({ stepNumber }) => {
-            // As the agent approaches MAX_COUNT, urge it to synthesize its findings
-            if (stepNumber >= SYNTHESIS_STEP_THRESHOLD) {
+          stopWhen: isProductiveLimitReached,
+          prepareStep: async ({ stepNumber, steps, messages }: any) => {
+            const { effectiveTurns, errorCount, forgivenErrors } = calculateEffectiveStep(steps || []);
+
+            // Step warning on the penultimate productive step
+            if (effectiveTurns === MAX_COUNT - 2) {
               return {
-                instructions: `${instructions}\n\nURGENT FINAL NOTICE: You are on step ${stepNumber + 1} of ${MAX_COUNT}. Do NOT make any more tool calls. Immediately synthesize all findings, calculations, and data gathered above into your final comprehensive markdown answer and present it to the user now.`,
+                messages: [
+                  ...messages,
+                  {
+                    role: "user" as const,
+                    content: `WARNING: You are on productive turn ${effectiveTurns + 1} of ${MAX_COUNT}. You have only 1 tool operation remaining. Conclude your data gathering now.`,
+                  },
+                ],
+              };
+            }
+            // Fix 1: On the final productive step, steer the model with an authoritative user prompt to synthesize text immediately
+            if (effectiveTurns >= MAX_COUNT - 1) {
+              return {
+                messages: [
+                  ...messages,
+                  {
+                    role: "user" as const,
+                    content: `STOP: You have reached the maximum allowed turns (${MAX_COUNT} of ${MAX_COUNT}). Do NOT call any more tools under any circumstances. Immediately synthesize all findings, calculations, and data gathered above into your final comprehensive markdown answer and present it to the user now.`,
+                  },
+                ],
               };
             }
             return undefined;
@@ -163,6 +227,18 @@ export const streamResponse = internalAction({
         await sandboxes.kill(ctx, { scope: "hawaii", key: args.threadId });
       } catch (err) {
         // Safe no-op if no sandbox was initialized
+      }
+
+      // Guaranteed reset of conversation thinking state
+      if (args.conversationId) {
+        try {
+          await ctx.runMutation(internal.conversations.setThinking, {
+            conversationId: args.conversationId,
+            thinking: false,
+          });
+        } catch (err) {
+          console.error("Failed to reset conversation thinking state:", err);
+        }
       }
     }
   },

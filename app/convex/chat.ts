@@ -42,6 +42,10 @@ export const sendMessage = mutation({
       throw new Error("Conversation not found");
     }
 
+    if (conversation.thinking) {
+      throw new Error("Assistant is currently responding. Please wait until generation completes.");
+    }
+
     let threadId = conversation.threadId;
     if (!threadId) {
       threadId = await createThread(ctx, components.agent, {
@@ -70,6 +74,9 @@ export const sendMessage = mutation({
       await ctx.db.patch(args.conversationId, { threadId });
     }
 
+    // Mark conversation as thinking while the response is generating
+    await ctx.db.patch(args.conversationId, { thinking: true });
+
     // Save user message to thread
     const { messageId } = await saveMessage(ctx, components.agent, {
       threadId,
@@ -78,6 +85,7 @@ export const sendMessage = mutation({
 
     // Schedule background action to stream the AI response
     await ctx.scheduler.runAfter(0, internal.chatActions.streamResponse, {
+      conversationId: args.conversationId,
       threadId,
       promptMessageId: messageId,
       district: conversation.district,
@@ -104,6 +112,10 @@ export const resubmitMessage = mutation({
     const conversation = await ctx.db.get(args.conversationId);
     if (!conversation) {
       throw new Error("Conversation not found");
+    }
+
+    if (conversation.thinking) {
+      throw new Error("Assistant is currently responding. Please wait until generation completes.");
     }
 
     let threadId = conversation.threadId;
@@ -154,12 +166,14 @@ export const resubmitMessage = mutation({
         await ctx.db.patch(args.conversationId, {
           title: trimmedContent,
           threadId,
+          thinking: true,
         });
       } else {
-        await ctx.db.patch(args.conversationId, { threadId });
+        await ctx.db.patch(args.conversationId, { threadId, thinking: true });
       }
 
       await ctx.scheduler.runAfter(0, internal.chatActions.streamResponse, {
+        conversationId: args.conversationId,
         threadId,
         promptMessageId: messageId,
         district: conversation.district,
@@ -216,10 +230,15 @@ export const resubmitMessage = mutation({
       },
     });
 
-    // 4. If this was the first user prompt (Turn 0), also update conversation title
+    // 4. Mark conversation as thinking and update title if Turn 0
     if (targetMsg.order === 0) {
       await ctx.db.patch(args.conversationId, {
         title: trimmedContent,
+        thinking: true,
+      });
+    } else {
+      await ctx.db.patch(args.conversationId, {
+        thinking: true,
       });
     }
 
@@ -231,6 +250,7 @@ export const resubmitMessage = mutation({
 
     // 5. Schedule the LLM to stream the response for this updated prompt
     await ctx.scheduler.runAfter(0, internal.chatActions.streamResponse, {
+      conversationId: args.conversationId,
       threadId,
       promptMessageId: args.messageId,
       district: conversation.district,

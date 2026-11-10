@@ -22,6 +22,7 @@ export default defineSchema({
     threadId: v.optional(v.string()),
     isPinned: v.optional(v.boolean()),
     userId: v.optional(v.id("users")),
+    thinking: v.optional(v.boolean()),
   })
     .index("by_user_folder", ["userId", "folderId"])
     .index("by_folder", ["folderId"]),

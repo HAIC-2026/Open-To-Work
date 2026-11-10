@@ -1,4 +1,4 @@
-import { mutation, query } from "./_generated/server"
+import { mutation, query, internalMutation } from "./_generated/server"
 import { v } from "convex/values"
 import type { Id } from "./_generated/dataModel"
 import { internal, components } from "./_generated/api"
@@ -18,6 +18,7 @@ export const list = query({
       threadId: v.optional(v.string()),
       isPinned: v.optional(v.boolean()),
       userId: v.optional(v.id("users")),
+      thinking: v.optional(v.boolean()),
     })
   ),
   handler: async (ctx, args) => {
@@ -59,6 +60,7 @@ export const get = query({
       threadId: v.optional(v.string()),
       isPinned: v.optional(v.boolean()),
       userId: v.optional(v.id("users")),
+      thinking: v.optional(v.boolean()),
     })
   ),
   handler: async (ctx, args) => {
@@ -164,6 +166,7 @@ export const create = mutation({
       threadId,
       isPinned: false,
       userId: targetUserId,
+      thinking: true,
     })
 
     // Save first user prompt message into the agent thread
@@ -174,6 +177,7 @@ export const create = mutation({
 
     // Trigger the background LLM response stream
     await ctx.scheduler.runAfter(0, internal.chatActions.streamResponse, {
+      conversationId,
       threadId,
       promptMessageId: messageId,
       district: args.district,
@@ -181,6 +185,21 @@ export const create = mutation({
     })
 
     return conversationId
+  },
+})
+
+export const setThinking = internalMutation({
+  args: {
+    conversationId: v.id("conversations"),
+    thinking: v.boolean(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const conv = await ctx.db.get(args.conversationId)
+    if (conv) {
+      await ctx.db.patch(args.conversationId, { thinking: args.thinking })
+    }
+    return null
   },
 })
 

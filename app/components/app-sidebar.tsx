@@ -13,6 +13,7 @@ import {
   Folder,
   FolderOpen,
   MessageSquare,
+  Loader2,
   ChevronsUpDown,
   Search,
   Monitor,
@@ -179,6 +180,7 @@ interface DraggableFolderConversationItemProps {
     title: string
     isPinned?: boolean
     folderId?: Id<"folders">
+    thinking?: boolean
   }
   folderId: Id<"folders">
   isActive: boolean
@@ -218,7 +220,11 @@ function DraggableFolderConversationItem({
         isActive={isActive}
         className="h-8 pr-16"
       >
-        <MessageSquare className="size-4 shrink-0 text-muted-foreground" />
+        {conv.thinking ? (
+          <Loader2 className="size-4 shrink-0 text-primary animate-spin" />
+        ) : (
+          <MessageSquare className="size-4 shrink-0 text-muted-foreground" />
+        )}
         <span className="truncate">{conv.title}</span>
       </SidebarMenuSubButton>
 
@@ -455,6 +461,7 @@ interface DraggableRecentConversationItemProps {
   conv: {
     _id: Id<"conversations">
     title: string
+    thinking?: boolean
   }
   isActive: boolean
   onDelete: (id: Id<"conversations">, isActive: boolean) => Promise<void>
@@ -491,7 +498,11 @@ function DraggableRecentConversationItem({
         tooltip={conv.title}
         className="h-8 pr-8"
       >
-        <MessageSquare className="size-4 shrink-0 text-muted-foreground" />
+        {conv.thinking ? (
+          <Loader2 className="size-4 shrink-0 text-primary animate-spin" />
+        ) : (
+          <MessageSquare className="size-4 shrink-0 text-muted-foreground" />
+        )}
         <span className="truncate">{conv.title}</span>
       </SidebarMenuButton>
 
