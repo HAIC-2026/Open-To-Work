@@ -25,6 +25,7 @@ export const listWithConversations = query({
           threadId: v.optional(v.string()),
           isPinned: v.optional(v.boolean()),
           userId: v.optional(v.id("users")),
+          thinking: v.optional(v.boolean()),
         })
       ),
     })
@@ -373,6 +374,7 @@ export const initDefaults = mutation({
           threadId,
           isPinned: false,
           userId: targetUser._id,
+          thinking: false,
         })
 
         await saveMessages(ctx, components.agent, {

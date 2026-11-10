@@ -112,11 +112,12 @@ export function PromptInput({
   const formRef = React.useRef<HTMLFormElement>(null)
   const inputRef = React.useRef<HTMLInputElement>(null)
 
-  const canSend = text.trim().length > 0
+  const isBlocked = disabled || isLoading
+  const canSend = text.trim().length > 0 && !isBlocked
 
   const onSubmit = (event: React.FormEvent) => {
     event.preventDefault()
-    if (!canSend) return
+    if (!canSend || isBlocked) return
     onSubmitProp?.(text, selectedDistrict, currentFolderId)
     setText("")
   }
@@ -126,15 +127,18 @@ export function PromptInput({
       <InputGroup className={cn("bg-background border border-foreground/20 dark:border-foreground/20 shadow-md", className)}>
         <InputGroupTextarea
           value={text}
+          disabled={isBlocked}
           onChange={(event) => setText(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey) {
               event.preventDefault()
-              formRef.current?.requestSubmit()
+              if (!isBlocked && text.trim().length > 0) {
+                formRef.current?.requestSubmit()
+              }
             }
           }}
           placeholder={placeholder}
-          className="p-3 text-base md:text-base leading-relaxed max-h-48 overflow-y-auto"
+          className="p-3 text-base md:text-base leading-relaxed max-h-48 overflow-y-auto disabled:opacity-50 disabled:cursor-not-allowed"
         />
 
         <InputGroupAddon align="block-end" className="flex items-center justify-between">
