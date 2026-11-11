@@ -1,5 +1,6 @@
 import * as React from "react"
 import type { Id } from "@/convex/_generated/dataModel"
+import { LEGISLATOR_ROSTER } from "@/convex/legislatorRoster"
 
 export interface LegislatorUser {
   _id?: Id<"users">
@@ -18,24 +19,8 @@ export function getChamber(district: string): "House" | "Senate" {
   return district.toLowerCase().startsWith("senate") ? "Senate" : "House"
 }
 
-export const INITIAL_LEGISLATORS: LegislatorUser[] = [
-  ...Array.from({ length: 51 }, (_, i) => {
-    const num = i + 1
-    return {
-      name: `Representative District ${num}`,
-      district: `house-district-${num}`,
-      photoUrl: "",
-    }
-  }),
-  ...Array.from({ length: 25 }, (_, i) => {
-    const num = i + 1
-    return {
-      name: `Senator District ${num}`,
-      district: `senate-district-${num}`,
-      photoUrl: "",
-    }
-  }),
-]
+// Same roster the database is seeded from, used until the users query loads.
+export const INITIAL_LEGISLATORS: LegislatorUser[] = LEGISLATOR_ROSTER.map((l) => ({ ...l }))
 
 export const DEFAULT_LEGISLATOR: LegislatorUser = INITIAL_LEGISLATORS[0]
 
@@ -87,7 +72,14 @@ export function useActiveLegislator(dbUsers?: LegislatorUser[]): [LegislatorUser
     if (!dbUsers || dbUsers.length === 0) return
     setCurrent((prev) => {
       const matched = dbUsers.find((u) => u.district === prev.district)
-      if (matched && matched._id !== prev._id) {
+      // Also refresh when the name or photo changed (e.g. after re-seeding),
+      // so the copy cached in localStorage doesn't keep stale details.
+      if (
+        matched &&
+        (matched._id !== prev._id ||
+          matched.name !== prev.name ||
+          matched.photoUrl !== prev.photoUrl)
+      ) {
         const updated = { ...prev, ...matched }
         try {
           localStorage.setItem(ACTIVE_LEGISLATOR_STORAGE_KEY, JSON.stringify(updated))
