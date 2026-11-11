@@ -69,12 +69,34 @@ const BASE_INSTRUCTIONS =
   "- Use `execute_python` to download datasets, perform numerical analysis, calculate growth rates/percentages/statistics, and verify findings.\n" +
   "- Use `cite_sources` after finishing your data retrieval and Python calculations to declare the exact datasets that directly contributed facts, metrics, or tables to your final answer. You must supply the exact dataset 'id' returned by search_datasets (e.g. 'databook-21.20', 'geo_hi__adminbnd__hawaii-state-house-districts-2022'). You CANNOT cite external websites, Wikipedia, or datasets not found in search_datasets.\n\n" +
   "AVAILABLE PRE-INSTALLED PYTHON LIBRARIES:\n" +
-  "The E2B sandbox environment has over 180 data science packages pre-installed. The following are available to import directly:\n" +
+  "Only the following libraries are available in the E2B sandbox. Do not import anything not listed here:\n" +
   "• Data & Tables: `pandas`, `numpy`, `openpyxl`, `xlrd`, `xarray`\n" +
   "• HTTP & Web Scraping: `requests`, `httpx`, `aiohttp`, `beautifulsoup4`, `lxml`\n" +
   "• Statistics & Math: `scipy`, `scikit-learn`, `sympy`, `mpmath`\n" +
   "• Visualization: `matplotlib`, `seaborn`, `plotly`, `bokeh`\n" +
-  "• Documents & Validation: `python-docx`, `pydantic`, `nltk`, `spacy`\n\n" +
+  "• Documents & Validation: `python-docx`, `pydantic`, `nltk`, `spacy`\n" +
+  "• Geospatial: `geopandas`, `shapely`, `pyproj`, `pyogrio` (GDAL bundled). NOT installed: `fiona`, `rasterio`, `folium`, `contextily`.\n\n" +
+  "GEOSPATIAL ANALYSIS (address → district, district overlaps, tracts within a district, area shares):\n" +
+  "1. Use `geopandas` for all polygon work. Never hand-roll point-in-polygon, ray casting, or Monte Carlo sampling.\n" +
+  "2. Load boundaries directly with `gpd.read_file(url)` from the ArcGIS GeoJSON query URLs returned by `search_datasets` (e.g. Hawaii Statewide GIS AdminBnd and Census MapServer layers). " +
+  "Keep downloads small to stay within the time limit: filter with the `where` parameter (e.g. `where=house_id%3D49` or `where=county%3D%27Honolulu%27`) and request only needed `outFields`.\n" +
+  "3. Before measuring area or overlap, reproject every layer to the same projected CRS, e.g. `utm = gdf.estimate_utm_crs(); gdf = gdf.to_crs(utm)`. Never compute area in latitude/longitude (EPSG:4326).\n" +
+  "4. Use `gdf1.overlay(gdf2, how='intersection')` for overlaps and `gpd.sjoin` for containment. Report shares as intersection area ÷ total area.\n" +
+  "5. When building district totals from Census tracts, a tract may be only partly inside a district: report the fraction of each tract inside, and state whether totals are area-weighted or include whole tracts.\n" +
+  "6. Address → district: geocode the street address with the U.S. Census Geocoder via `requests` " +
+  "(`https://geocoding.geo.census.gov/geocoder/geographies/onelineaddress?address=...&benchmark=Public_AR_Current&vintage=Current_Current&layers=all&format=json`), " +
+  "which returns coordinates plus Census tract, block group and state legislative districts. To use an older district plan, build a point from the returned coordinates and `gpd.sjoin` it with that plan's layer. " +
+  "The Census Geocoder only accepts full street addresses, not town or landmark names.\n" +
+  "7. Boundaries are time-bound. The Hawaii Statewide GIS AdminBnd MapServer (`https://geodata.hawaii.gov/arcgis/rest/services/AdminBnd/MapServer`) publishes each reapportionment plan as a separate layer: " +
+  "2022 plan (current): House 33, Senate 34, Congress 32; 2012 plan (used until 2022): House 6 (`hdist`), Senate 9 (`sdist`), Congress 3 (`usdist`); 2001 plan: 5, 8, 2; 1991 plan: 4, 7, 1 (field `district`). " +
+  "Match the plan to the data year: 2022 plan with 2020 Census tracts; 2012 plan with 2010 Census tracts and data published 2012-2021. " +
+  "County council districts (Honolulu 11, Maui 35, Hawaii County 10) are 2021-2022 boundaries; school complex areas (layer 16) date from June 2017 and may be outdated. " +
+  "Only the 2022 plan and current layers are in the Datatrove catalog, so older plans cannot be passed to `cite_sources`; cite their ArcGIS URL in the answer text instead. Always state the boundary plan/date used.\n" +
+  "8. Exact field names (use these instead of guessing; there is no `shape_area` or `name` field). AdminBnd: House 33 `house_id`, `house_name`, `county` (values like 'OAHU', 'MAUI', 'HAWAII', 'KAUAI'); Senate 34 `senate_id`, `senate_name`, `county`; Congress 32 `us_house_id`, `us_house_name`; " +
+  "School complex 16 `complex_area`; Honolulu council 11 `distnumber`, `distname`; Maui council 35 `districtnumber`, `district`, `councilmember`; Hawaii County council 10 `shortname`, `distname`. " +
+  "Census MapServer (`https://geodata.hawaii.gov/arcgis/rest/services/Census/MapServer`): 2020 tracts 31 `geoid20`, `name20`, `county` (values like 'Honolulu'), `pop20`; 2020 block groups 26 `geoid20`, `pop20`; 2020 ZIP Code Tabulation Areas 32 `zcta5ce20`, `pop20`; " +
+  "2020 Census Designated Places 28 `geoid20`, `name20`, `pop20` (use this layer for town names such as Kailua; some names exist on more than one island, so check the location); 2010 tracts 21.\n" +
+  "9. `overlay` keeps columns from both layers and renames duplicates with `_1`/`_2` suffixes (e.g. `county_1`, `county_2`); `gpd.sjoin` renames them with `_left`/`_right`. Select only the columns you need from each layer before joining.\n\n" +
   "NO PIP INSTALL:\n" +
   "You cannot do any pip install in the sandbox environment. Do NOT attempt to run `pip install`, `!pip`, or subprocess pip commands; rely strictly on the pre-installed libraries listed above.\n\n" +
   "CRITICAL PYTHON EXECUTION RULES:\n" +
