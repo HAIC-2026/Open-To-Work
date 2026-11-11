@@ -657,14 +657,7 @@ export function AppSidebar({
   const router = useRouter()
   const dbUsers = useQuery(api.users.list)
   const [currentUser, setCurrentUser] = useActiveLegislator(dbUsers)
-  const initLegislators = useMutation(api.users.initLegislators)
   const { handlePointerDown: handleRailPointerDown, handleClick: handleRailClick } = useSidebarResizeRail()
-
-  React.useEffect(() => {
-    if (dbUsers !== undefined && dbUsers.length === 0) {
-      initLegislators()
-    }
-  }, [dbUsers, initLegislators])
 
   const RECENTS_PAGE_SIZE = 20
   const {
@@ -687,7 +680,6 @@ export function AppSidebar({
   const createFolder = useMutation(api.folders.create)
   const removeFolder = useMutation(api.folders.remove)
   const renameFolder = useMutation(api.folders.rename)
-  const initDefaults = useMutation(api.folders.initDefaults)
 
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = React.useState(false)
@@ -746,13 +738,6 @@ export function AppSidebar({
   React.useEffect(() => {
     setMounted(true)
   }, [])
-
-  // Auto-seed default project folders if none exist yet for this user
-  React.useEffect(() => {
-    if (currentUser._id && projectFolders !== undefined && projectFolders.length === 0) {
-      initDefaults({ userId: currentUser._id })
-    }
-  }, [projectFolders, currentUser._id, initDefaults])
 
   const allLegislators = React.useMemo(() => {
     return dbUsers && dbUsers.length > 0 ? dbUsers : INITIAL_LEGISLATORS

@@ -1,7 +1,6 @@
 import { mutation, query } from "./_generated/server"
 import { v } from "convex/values"
 import type { Id } from "./_generated/dataModel"
-import { LEGISLATOR_ROSTER } from "./legislatorRoster"
 
 export const list = query({
   args: {},
@@ -64,50 +63,6 @@ export const getByDistrict = query({
       .query("users")
       .withIndex("by_district", (q) => q.eq("district", args.district))
       .first()
-  },
-})
-
-export const initLegislators = mutation({
-  args: {},
-  returns: v.object({
-    totalUsers: v.number(),
-    defaultUserId: v.id("users"),
-  }),
-  handler: async (ctx) => {
-    // Real legislators (see legislatorRoster.ts). Rows are matched by district,
-    // so existing user IDs (and their conversations/folders) are kept, and
-    // names/photos are refreshed when the roster changes.
-    for (const item of LEGISLATOR_ROSTER) {
-      const existing = await ctx.db
-        .query("users")
-        .withIndex("by_district", (q) => q.eq("district", item.district))
-        .first()
-
-      if (!existing) {
-        await ctx.db.insert("users", {
-          name: item.name,
-          district: item.district,
-          photoUrl: item.photoUrl,
-        })
-      } else if (existing.name !== item.name || existing.photoUrl !== item.photoUrl) {
-        await ctx.db.patch(existing._id, { name: item.name, photoUrl: item.photoUrl })
-      }
-    }
-
-    const defaultUser = await ctx.db
-      .query("users")
-      .withIndex("by_district", (q) => q.eq("district", "house-district-1"))
-      .first()
-
-    if (!defaultUser) {
-      throw new Error("Failed to initialize default user for house-district-1")
-    }
-
-    const all = await ctx.db.query("users").collect()
-    return {
-      totalUsers: all.length,
-      defaultUserId: defaultUser._id,
-    }
   },
 })
 
