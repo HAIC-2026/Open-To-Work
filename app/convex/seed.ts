@@ -1,20 +1,21 @@
-import { internalAction, internalMutation, type ActionCtx } from "./_generated/server"
+import { internalAction, internalMutation } from "./_generated/server"
 import { v } from "convex/values"
 import { components, internal } from "./_generated/api"
 import { createThread, saveMessages } from "@convex-dev/agent"
 import { LEGISLATOR_ROSTER } from "./legislatorRoster"
 
 /**
- * One seeder for the whole app: the 76 legislators (real names and official
- * photos from legislatorRoster.ts) and each legislator's starter folders with
- * sample conversations. Safe to run any number of times — it only fills in
- * what's missing and refreshes names/photos, never duplicates or deletes.
+ * Resets the app to its original state: deletes every conversation, agent
+ * thread (messages, streams), folder and user, then seeds the 76 legislators
+ * (real names and official photos from legislatorRoster.ts) with their starter
+ * folders and sample conversations. Internal, so only you can run it:
  *
  *   npx convex run seed:seed            (dev)
  *   npx convex run seed:seed --prod     (prod)
  *
- * It runs one legislator per transaction, because creating every thread in a
- * single mutation could exceed Convex's 1-second mutation execution limit.
+ * Irreversible: all conversations are deleted and user IDs change. Work is
+ * split into small mutations (one batch / one legislator each) to stay within
+ * Convex's 1-second mutation execution limit.
  */
 
 /** Starter folders and sample conversations for one district. */
@@ -149,38 +150,36 @@ return [
   ]
 }
 
-/** Upserts one legislator, then gives them starter folders if they have none. */
+const APP_TABLES = ["messages", "conversations", "folders", "users"] as const
+
+/** Deletes up to `batchSize` documents from one app table; returns how many. */
+export const deleteBatch = internalMutation({
+  args: {
+    table: v.union(...APP_TABLES.map((t) => v.literal(t))),
+    batchSize: v.number(),
+  },
+  returns: v.number(),
+  handler: async (ctx, args) => {
+    const docs = await ctx.db.query(args.table).take(args.batchSize)
+    for (const doc of docs) await ctx.db.delete(doc._id)
+    return docs.length
+  },
+})
+
+/** Creates one legislator and their starter folders and sample conversations. */
 export const seedLegislator = internalMutation({
   args: {
     district: v.string(),
     name: v.string(),
     photoUrl: v.optional(v.string()),
   },
-  returns: v.object({ userCreated: v.boolean(), foldersCreated: v.boolean() }),
+  returns: v.null(),
   handler: async (ctx, args) => {
-    // Matched by district so existing user IDs (and their conversations) are kept.
-    const existing = await ctx.db
-      .query("users")
-      .withIndex("by_district", (q) => q.eq("district", args.district))
-      .first()
-
-    let userId = existing?._id
-    if (!existing) {
-      userId = await ctx.db.insert("users", {
-        name: args.name,
-        district: args.district,
-        photoUrl: args.photoUrl,
-      })
-    } else if (existing.name !== args.name || existing.photoUrl !== args.photoUrl) {
-      await ctx.db.patch(existing._id, { name: args.name, photoUrl: args.photoUrl })
-    }
-    if (!userId) throw new Error(`Could not seed ${args.district}`)
-
-    const hasFolders = await ctx.db
-      .query("folders")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .first()
-    if (hasFolders) return { userCreated: !existing, foldersCreated: false }
+    const userId = await ctx.db.insert("users", {
+      name: args.name,
+      district: args.district,
+      photoUrl: args.photoUrl,
+    })
 
     // e.g. "House District 1" or "Senate District 5"
     const num = args.district.replace(/\D/g, "")
@@ -220,42 +219,76 @@ export const seedLegislator = internalMutation({
         })
       }
     }
-
-    return { userCreated: !existing, foldersCreated: true }
+    return null
   },
 })
 
-const seedResult = v.object({
-  totalUsers: v.number(),
-  usersCreated: v.number(),
-  foldersCreatedFor: v.number(),
-})
-
-/** Seeds every legislator; shared by `seed` and admin:resetDatabase. */
-export async function seedAll(ctx: ActionCtx) {
-  let usersCreated = 0
-  let foldersCreatedFor = 0
-  for (const l of LEGISLATOR_ROSTER) {
-    const r: { userCreated: boolean; foldersCreated: boolean } = await ctx.runMutation(
-      internal.seed.seedLegislator,
-      { district: l.district, name: l.name, photoUrl: l.photoUrl }
-    )
-    if (r.userCreated) usersCreated++
-    if (r.foldersCreated) foldersCreatedFor++
-  }
-  return { totalUsers: LEGISLATOR_ROSTER.length, usersCreated, foldersCreatedFor }
+type SeedResult = {
+  agentThreadsDeleted: number
+  deleted: Record<string, number>
+  seededUsers: number
 }
 
-/**
- * Internal: run it yourself from the CLI or the Convex dashboard (the app never
- * seeds on its own). It only adds missing legislators/folders and refreshes
- * names/photos.
- */
 export const seed = internalAction({
   args: {},
-  returns: seedResult,
-  // Explicit return type: this file references itself via `internal.seed`.
-  handler: async (
-    ctx
-  ): Promise<{ totalUsers: number; usersCreated: number; foldersCreatedFor: number }> => seedAll(ctx),
+  returns: v.object({
+    agentThreadsDeleted: v.number(),
+    deleted: v.record(v.string(), v.number()),
+    seededUsers: v.number(),
+  }),
+  // Explicit return type: this handler references its own file via
+  // `internal.seed`, which otherwise makes the generated API types circular.
+  handler: async (ctx): Promise<SeedResult> => {
+    // 1. Agent component data. Threads in this app are created without a
+    //    userId, so list those directly; also clear any user-scoped threads.
+    const threadIds: string[] = []
+    let cursor: string | null = null
+    do {
+      const page: { page: { _id: string }[]; isDone: boolean; continueCursor: string } =
+        await ctx.runQuery(components.agent.threads.listThreadsByUserId, {
+          paginationOpts: { cursor, numItems: 200 },
+        })
+      threadIds.push(...page.page.map((t) => t._id))
+      cursor = page.isDone ? null : page.continueCursor
+    } while (cursor)
+
+    for (const threadId of threadIds) {
+      // Deletes the thread's messages and streams in the background.
+      await ctx.runMutation(components.agent.threads.deleteAllForThreadIdAsync, { threadId })
+    }
+
+    let userCursor: string | null = null
+    do {
+      const page: { page: string[]; isDone: boolean; continueCursor: string } =
+        await ctx.runQuery(components.agent.users.listUsersWithThreads, {
+          paginationOpts: { cursor: userCursor, numItems: 100 },
+        })
+      for (const userId of page.page) {
+        await ctx.runMutation(components.agent.users.deleteAllForUserIdAsync, { userId })
+      }
+      userCursor = page.isDone ? null : page.continueCursor
+    } while (userCursor)
+
+    // 2. App tables, in batches.
+    const deleted: Record<string, number> = {}
+    for (const table of APP_TABLES) {
+      deleted[table] = 0
+      while (true) {
+        const n: number = await ctx.runMutation(internal.seed.deleteBatch, { table, batchSize: 500 })
+        deleted[table] += n
+        if (n === 0) break
+      }
+    }
+
+    // 3. Seed the legislators and their starter folders, one per transaction.
+    for (const l of LEGISLATOR_ROSTER) {
+      await ctx.runMutation(internal.seed.seedLegislator, {
+        district: l.district,
+        name: l.name,
+        photoUrl: l.photoUrl,
+      })
+    }
+
+    return { agentThreadsDeleted: threadIds.length, deleted, seededUsers: LEGISLATOR_ROSTER.length }
+  },
 })
