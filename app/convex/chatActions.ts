@@ -7,6 +7,7 @@ import { Agent, listUIMessages, listStreams } from "@convex-dev/agent";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateText } from "ai";
 import { searchDatasets, getDatasetDetails, exploreDataSources, citeSources } from "./datatrove";
+import { getCensusTable } from "./census";
 import { executePython, sandboxes } from "./e2bTools";
 import { LEGISLATOR_ROSTER } from "./legislatorRoster";
 
@@ -84,7 +85,9 @@ const RESPONSE_RULES =
   "6. GROUNDED DETAILS: Only state facts and figures that come from retrieved data, tool results, or the legislator roster below. Never give approximate or remembered figures (e.g. \"about 35,000 residents\") without a retrieved source. " +
   "Do not list the neighborhoods, communities, or landmarks a district covers unless a tool result in this conversation names them (e.g. a spatial overlay with Census places or tract names); otherwise describe location only by island and county. " +
   "District numbers were redrawn in 2022, so remembered district geography is likely wrong. " +
-  "Name a district's legislator only from the roster below; if asked about past legislators or election history, say this information is not in your data.\n\n" +
+  "Name a district's legislator only from the roster below; if asked about past legislators or election history, say this information is not in your data.\n" +
+  "7. CHECK SOURCE TABLES: Published tables can contain errors. Before using a derived value (an \"each additional person\" amount, a total, a change, or a percentage), check it against the table's own numbers (e.g. the 8-person value minus the 7-person value). " +
+  "If they disagree, use the value you computed from the underlying numbers and say that the published column appears inconsistent.\n\n" +
   "CURRENT LEGISLATOR ROSTER (2022 district plan; names from Open States, verified against capitol.hawaii.gov, Nov 2026). Match the district number exactly:\n" +
   LEGISLATOR_ROSTER.map(
     (l) => `- ${l.district.startsWith("house") ? "House" : "Senate"} District ${l.district.replace(/\D/g, "")} = ${l.name}`
@@ -99,8 +102,16 @@ const BASE_INSTRUCTIONS =
   "- Use `search_datasets` to find official Hawaii datasets (DBEDT, Honolulu DPP, UHERO, HECO, PUC, DOH, DOTAX, DLIR, etc.) and obtain direct download URLs.\n" +
   "- Use `get_dataset_details` to inspect exact column schemas, data types, sample values, and data limitations/biases before analyzing.\n" +
   "- Use `explore_data_sources` to browse what Hawaii agencies publish.\n" +
+  "- Use `get_census_table` to fetch American Community Survey tables directly from the U.S. Census Bureau's Census Data API when Datatrove does not have the year, table, or geography you need (see CENSUS DATA below).\n" +
   "- Use `execute_python` to download datasets, perform numerical analysis, calculate growth rates/percentages/statistics, and verify findings.\n" +
-  "- Use `cite_sources` after finishing your data retrieval and Python calculations, and BEFORE writing your final answer, to declare the exact datasets that directly contributed facts, metrics, or tables (with each one's data year, geography, and whether it was apportioned). It returns them numbered for inline citation markers. You must supply the exact dataset 'id' returned by search_datasets (e.g. 'databook-21.20', 'geo_hi__adminbnd__hawaii-state-house-districts-2022'). You CANNOT cite external websites, Wikipedia, or datasets not found in search_datasets.\n\n" +
+  "- Use `cite_sources` after finishing your data retrieval and Python calculations, and BEFORE writing your final answer, to declare the exact datasets that directly contributed facts, metrics, or tables (with each one's data year, geography, and whether it was apportioned). It returns them numbered for inline citation markers. You must supply the exact dataset 'id' returned by search_datasets (e.g. 'databook-21.20', 'geo_hi__adminbnd__hawaii-state-house-districts-2022') or the `citationId` returned by get_census_table (e.g. 'census:acs1:2025:B19013'). You CANNOT cite external websites, Wikipedia, or datasets not returned by those tools.\n\n" +
+  "CENSUS DATA (American Community Survey):\n" +
+  "1. Search Datatrove first; its Census entries are 2020–2024 ACS 5-year tables for the state, counties, places, tracts, and State House and Senate districts. Use `get_census_table` when Datatrove lacks the year (e.g. 2025), the table, or the geography.\n" +
+  "2. ACS 1-year estimates (e.g. 2025) are published only for areas with 65,000+ people: the State of Hawaiʻi and Hawaiʻi, Honolulu, Kauaʻi and Maui counties (not Kalawao). They are never published for State House or Senate districts, which have only 5-year estimates, so for district figures the latest 5-year period is the most recent data. " +
+  "Say \"most recent\" only with that scope (e.g. \"the most recent district-level estimates\").\n" +
+  "3. When the user asks for newer data than a district's 5-year estimates, give the district's 5-year figure and, clearly labelled as county or state data, the latest 1-year figure for the district's county and for the state. Never present a county or state figure as the district's.\n" +
+  "4. Do not treat a 1-year and a 5-year estimate as a change over time; they cover different periods and samples. Compare 1-year with 1-year, or non-overlapping 5-year periods.\n" +
+  "5. With `get_census_table`, first list the table's variables (optionally with `labelFilter`), then request only the variable IDs you need. Use the returned MOE, standard error, and CV; if a value has `publishedAs` (e.g. \"2,000,000+\"), report that bound rather than the number.\n\n" +
   "AVAILABLE PRE-INSTALLED PYTHON LIBRARIES:\n" +
   "Only the following libraries are available in the E2B sandbox. Do not import anything not listed here:\n" +
   "• Data & Tables: `pandas`, `numpy`, `openpyxl`, `xlrd`, `xarray`\n" +
@@ -183,6 +194,7 @@ export const assistantAgent = new Agent(components.agent, {
     search_datasets: searchDatasets,
     get_dataset_details: getDatasetDetails,
     explore_data_sources: exploreDataSources,
+    get_census_table: getCensusTable,
     execute_python: executePython,
     cite_sources: citeSources,
   },

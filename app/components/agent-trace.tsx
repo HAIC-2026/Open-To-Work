@@ -30,6 +30,7 @@ import {
   Globe,
   Wrench,
   AlertCircle,
+  Landmark,
 } from "lucide-react"
 import { SourceFavicon } from "./sources"
 
@@ -76,6 +77,14 @@ function getToolMeta(toolName?: string) {
         runningText: "Exploring Hawaii public data sources...",
         doneText: "Explored Hawaii data sources",
         errorText: "Failed to load data sources",
+      }
+    case "get_census_table":
+      return {
+        icon: Landmark,
+        label: "Census Data API",
+        runningText: "Fetching Census Bureau data...",
+        doneText: "Fetched Census Bureau data",
+        errorText: "Census data request failed",
       }
     case "cite_sources":
       return {
@@ -250,6 +259,29 @@ export function AgentTrace({
                   : isError
                   ? `Failed: ${purpose}`
                   : purpose
+              } else if (rawToolName === "get_census_table" && input.table) {
+                const survey =
+                  input.survey === "acs1"
+                    ? `${input.year} ACS 1-year`
+                    : input.survey === "acs5" && typeof input.year === "number"
+                    ? `${input.year - 4}–${input.year} ACS 5-year`
+                    : "ACS"
+                const where =
+                  typeof input.geography === "string"
+                    ? input.geography.replace(/_/g, " ").replace(/^state$/, "state of Hawaiʻi")
+                    : "Hawaiʻi"
+                const what = input.variables?.length
+                  ? `${survey} ${input.table} for ${where}`
+                  : `variables in ${survey} ${input.table}`
+                title = isRunning
+                  ? `Fetching ${what} from the Census Bureau...`
+                  : isInterrupted
+                  ? `Fetching ${what} (halted)`
+                  : isError || output?.error
+                  ? `Census request for ${input.table} failed`
+                  : input.variables?.length
+                  ? `Fetched ${what} from the Census Bureau`
+                  : `Listed ${what}`
               } else if (rawToolName === "cite_sources") {
                 const count = output?.count ?? output?.sources?.length ?? input?.sources?.length
                 title = isRunning

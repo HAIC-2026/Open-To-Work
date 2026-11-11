@@ -1,5 +1,11 @@
 import { createTool } from "@convex-dev/agent";
 import { z } from "zod";
+import {
+  censusTableUrl,
+  fetchCensusTableMeta,
+  parseCensusCitationId,
+  surveyLabel,
+} from "./census";
 
 const API_URL = (process.env.DATATROVE_API_URL as string).replace(/\/+$/, "");
 
@@ -269,7 +275,7 @@ export const exploreDataSources = createTool({
  */
 export const citeSources = createTool({
   description:
-    "Call this BEFORE writing your final answer to register the exact Hawaii datasets from your previous search_datasets results that supplied facts, calculations, or tables. You MUST provide the exact dataset 'id' returned by search_datasets (e.g. 'databook-21.20', 'dbedt_warehouse-construction-and-housing-home-sales-and-prices-board-of-realtors-data', or 'geo_hi__adminbnd__hawaii-state-house-districts-2022'). You CANNOT invent external URLs, Wikipedia links, or cite datasets that were not returned by search_datasets. " +
+    "Call this BEFORE writing your final answer to register the exact Hawaii datasets from your previous search_datasets results that supplied facts, calculations, or tables. You MUST provide the exact dataset 'id' returned by search_datasets (e.g. 'databook-21.20', 'dbedt_warehouse-construction-and-housing-home-sales-and-prices-board-of-realtors-data', or 'geo_hi__adminbnd__hawaii-state-house-districts-2022'), or the exact `citationId` returned by get_census_table (e.g. 'census:acs1:2025:B19013'). You CANNOT invent external URLs, Wikipedia links, or cite datasets that were not returned by those tools. " +
     "Returns the verified sources numbered 1..n in the order you listed them; in the answer, put the matching marker (e.g. [1] or [1, 2]) right after every figure taken from that source.",
   inputSchema: z.object({
     sources: z
@@ -278,7 +284,7 @@ export const citeSources = createTool({
           datasetId: z
             .string()
             .describe(
-              "The exact unique dataset 'id' from search_datasets (e.g. 'databook-21.20', 'databook-13.26', 'geo_hi__adminbnd__hawaii-state-house-districts-2022'). Do NOT invent fake IDs or cite Wikipedia."
+              "The exact unique dataset 'id' from search_datasets (e.g. 'databook-21.20', 'databook-13.26', 'geo_hi__adminbnd__hawaii-state-house-districts-2022'), or the `citationId` from get_census_table (e.g. 'census:acs1:2025:B19013'). Do NOT invent fake IDs or cite Wikipedia."
             ),
           reason: z
             .string()
@@ -322,6 +328,38 @@ export const citeSources = createTool({
       args.sources.map(async (s, index) => {
         const cleanId = (s.datasetId || "").trim();
         if (!cleanId) return;
+
+        // Census Data API tables from get_census_table: verified against the
+        // API's own table metadata instead of the Datatrove catalog.
+        if (cleanId.startsWith("census:")) {
+          const parsed = parseCensusCitationId(cleanId);
+          const meta = parsed
+            ? await fetchCensusTableMeta(parsed.survey, parsed.year, parsed.table, options?.abortSignal)
+            : null;
+          if (!parsed || !meta) {
+            rejectedSources.push({
+              datasetId: cleanId,
+              error: `'${cleanId}' is not a Census table returned by get_census_table (expected e.g. 'census:acs1:2025:B19013').`,
+            });
+            return;
+          }
+          const vintage = surveyLabel(parsed.survey, parsed.year);
+          verifiedByIndex.set(index, {
+            id: cleanId,
+            datasetId: cleanId,
+            title: `${meta.title} (${vintage}, table ${parsed.table})`,
+            organization: "U.S. Census Bureau",
+            source: "census_api",
+            url: censusTableUrl(parsed.survey, parsed.year, parsed.table),
+            reason: s.reason,
+            year: s.year,
+            geography: s.geography,
+            apportioned: s.apportioned,
+            apportionmentMethod: s.apportioned ? s.apportionmentMethod : undefined,
+            coverage: vintage,
+          });
+          return;
+        }
 
         try {
           const res = await fetch(`${API_URL}/api/dataset/${encodeURIComponent(cleanId)}`, {
