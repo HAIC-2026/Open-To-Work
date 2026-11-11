@@ -49,6 +49,17 @@ export const executePython = createTool({
     "Has outbound internet access to download datasets directly from Hawaii open data and Census URLs using requests.get(url). " +
     "You cannot do any pip install in the sandbox environment.",
   inputSchema: z.object({
+    // Listed before `code` so the model states its intent first. Shown to the
+    // user as the step label in the agent trace.
+    purpose: z
+      .string()
+      .describe(
+        "A short phrase (4-10 words) shown to the user describing what this script does. " +
+        "Start with an -ing verb, plain language, no code, no trailing punctuation. " +
+        'Examples: "Calculating poverty rate change from 2015 to 2022", ' +
+        '"Downloading ACS income table for House District 25", ' +
+        '"Comparing district median income to the state".'
+      ),
     code: z
       .string()
       .describe(
