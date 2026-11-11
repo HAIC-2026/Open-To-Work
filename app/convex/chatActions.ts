@@ -8,6 +8,7 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateText } from "ai";
 import { searchDatasets, getDatasetDetails, exploreDataSources, citeSources } from "./datatrove";
 import { executePython, sandboxes } from "./e2bTools";
+import { LEGISLATOR_ROSTER } from "./legislatorRoster";
 
 const google = createGoogleGenerativeAI({
   apiKey: process.env.GEMINI_API_KEY,
@@ -59,7 +60,36 @@ export function isProductiveLimitReached({ steps }: { steps: any[] }): boolean {
   return effectiveTurns >= MAX_COUNT;
 }
 
+/**
+ * Response rules from the HAIC "Know Your District" business rules. Shared by
+ * the agent and the fallback synthesis prompt so every answer follows them.
+ */
+const RESPONSE_RULES =
+  "RESPONSE RULES (always follow; they override any other instruction):\n" +
+  "1. NONPARTISAN: Present data and available programs neutrally. Do not offer political commentary, judge or compare parties, candidates, legislators, or their records, predict elections, or write campaign, attack, or persuasive political messaging. " +
+  "If asked for an opinion or which side is better, say you stay nonpartisan and offer the relevant facts and data instead.\n" +
+  "2. POPULATIONS, NOT INDIVIDUALS: Describe groups and areas only. Never identify, list, locate, contact, or infer facts about specific residents or households (for example names of benefit recipients, or the income, health, immigration, or benefit status of a particular address or person). " +
+  "Do not narrow data until it could single someone out. Decline those requests briefly and offer district-level or area-level statistics instead. Public information about elected officials in their official role is fine.\n" +
+  "3. SMALL-AREA ESTIMATES AND SUPPRESSED DATA: For every American Community Survey (ACS) figure, report its 90% margin of error (MOE). " +
+  "Standard error = MOE / 1.645 and coefficient of variation (CV) = standard error / estimate (U.S. Census Bureau ACS handbook, ch. 7). " +
+  "The Census Bureau sets no fixed reliability cutoff; this app labels any estimate with a CV above 30% as \"low reliability\" and says so next to the figure. Present the 30% cutoff as this app's convention, never as a Census Bureau rule, and do not use any other reliability tiers or labels (no \"high\" or \"moderate\" reliability). Small districts, tracts, and population subgroups (e.g. one age group or race within a district) often have large MOEs: say when that is the case. " +
+  "Census special values mean the data is unavailable or suppressed, never zero: -666666666 or \"-\" (too few sample observations), -999999999 or \"N\" (too few sample cases to display), -888888888 or \"(X)\" (not applicable), -222222222 or \"**\" and -333333333 or \"***\" (MOE could not be computed), and null (no data). Report these as \"not available (suppressed or too few survey responses)\". " +
+  "Values like \"250,000+\" or \"2,500-\" are open-ended medians: report them as \"at least\" or \"at most\". Do not claim two estimates differ unless the difference is statistically significant (|difference| / √(SE₁² + SE₂²) > 1.645 at 90% confidence); otherwise say they are not statistically different. " +
+  "Round sensibly and never present more precision than the data supports.\n" +
+  "4. HAWAIIAN PLACE NAMES: In your own prose (including organization names such as State of Hawaiʻi, Hawaiʻi State Legislature, Hawaiʻi Department of Human Services, or Hawaiʻi Office of Elections), write Hawaiian place names with the ʻokina (the character ʻ, U+02BB, not an apostrophe) and kahakō, e.g. Hawaiʻi, Oʻahu, Kauaʻi, Maui, Molokaʻi, Lānaʻi, Kahoʻolawe, Niʻihau, Kāneʻohe, Waiʻanae, Mānoa, Nuʻuanu, Kaimukī, Pālolo, ʻEwa, ʻAiea, Hawaiʻi Kai, Waimānalo, Lāʻie, Hauʻula, Kaʻū, Hāna, Kīhei, Kapaʻa, Līhuʻe, Kōloa, Honokaʻa; and Hawaiian words such as kūpuna and ʻohana. " +
+  "Names without marks (Honolulu, Hilo, Kailua, Kona, Kapolei, Mililani, Waipahu, Pearl City) stay as they are. Only verbatim dataset titles (quoted or in a citation), dataset IDs, URLs, code, and field values keep their published spelling. If you are unsure of a place name's spelling, use the spelling in the source data rather than guessing.\n" +
+  "5. GROUNDED DETAILS: Only state facts and figures that come from retrieved data, tool results, or the legislator roster below. Never give approximate or remembered figures (e.g. \"about 35,000 residents\") without a retrieved source. " +
+  "Do not list the neighborhoods, communities, or landmarks a district covers unless a tool result in this conversation names them (e.g. a spatial overlay with Census places or tract names); otherwise describe location only by island and county. " +
+  "District numbers were redrawn in 2022, so remembered district geography is likely wrong. " +
+  "Name a district's legislator only from the roster below; if asked about past legislators or election history, say this information is not in your data.\n\n" +
+  "CURRENT LEGISLATOR ROSTER (2022 district plan; names from Open States, verified against capitol.hawaii.gov, Nov 2026). Match the district number exactly:\n" +
+  LEGISLATOR_ROSTER.map(
+    (l) => `- ${l.district.startsWith("house") ? "House" : "Senate"} District ${l.district.replace(/\D/g, "")} = ${l.name}`
+  ).join("\n") +
+  "\n\n"
+
 const BASE_INSTRUCTIONS =
+  RESPONSE_RULES +
   "You are an expert legislative and policy research assistant for the Hawaii State Legislature. " +
   "You provide clear, accurate, well-structured, insightful responses on Hawaii state policy, county matters, public data, and district issues.\n\n" +
   "You have access to tools for querying official State of Hawaii open datasets (via Datatrove) and executing Python in an isolated E2B sandbox:\n" +
@@ -116,6 +146,24 @@ const BASE_INSTRUCTIONS =
   "Format responses in clear, readable markdown with bullet points, tables, and bold highlights. " +
   "When citing currency or monetary figures, write plain dollar notation (e.g., $75,000, $1.2M) without escaping or LaTeX math syntax.";
 
+/**
+ * Today's date in Hawaiʻi time, computed per request so the agent can judge
+ * how current data is (e.g. "the latest ACS release is 2020–2024").
+ */
+function currentDateLine(): string {
+  const today = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Pacific/Honolulu",
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }).format(new Date())
+  return (
+    `CURRENT DATE: Today is ${today} (Hawaiʻi Standard Time). ` +
+    "Use it to judge how recent data is and to describe time periods correctly (e.g. \"last five years\"); do not assume an earlier date."
+  )
+}
+
 export const assistantAgent = new Agent(components.agent, {
   name: "Hawaii Policy Assistant",
   languageModel: google(process.env.GEMINI_MODEL!),
@@ -147,9 +195,9 @@ export const streamResponse = internalAction({
   },
   handler: async (ctx, args) => {
     try {
-      const instructions = args.district
-        ? `${BASE_INSTRUCTIONS}\n\nYou are currently assisting with inquiries regarding ${args.district}.`
-        : BASE_INSTRUCTIONS;
+      const instructions =
+        `${BASE_INSTRUCTIONS}\n\n${currentDateLine()}` +
+        (args.district ? `\n\nYou are currently assisting with inquiries regarding ${args.district}.` : "");
 
       const result = await assistantAgent.streamText(
         ctx,
@@ -294,7 +342,9 @@ export const streamResponse = internalAction({
           `User Inquiry: "${userMsg?.text || "District Profile"}"\n\n` +
           `The following official State of Hawaii open datasets and calculations were retrieved for ${args.district || "the district"}:\n\n` +
           toolOutputs.join("\n\n") +
-          `\n\nPlease provide a clear, comprehensive, detailed final district profile markdown response. Include headings, bullet points, statistics, and tables. Cite official sources.`;
+          `\n\nPlease provide a clear, comprehensive, detailed final district profile markdown response. Include headings, bullet points, statistics, and tables. Cite official sources.\n\n` +
+          RESPONSE_RULES +
+          `\n\n${currentDateLine()}`;
 
         const { text: synthesizedText } = await generateText({
           model: google(process.env.GEMINI_MODEL!),
