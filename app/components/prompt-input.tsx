@@ -19,6 +19,7 @@ import type { Id } from "@/convex/_generated/dataModel"
 import { Spinner } from "@/components/ui/spinner"
 import { cn } from "cn"
 import { useActiveLegislator, formatDistrictTitle } from "@/lib/legislators"
+import { ExploreDistrictsDrawer } from "@/components/district-map/explore-districts-drawer"
 
 import {
   InputGroup,
@@ -94,6 +95,8 @@ export function PromptInput({
     formatDistrictTitle(activeLegislator.district)
   )
   const [districtOpen, setDistrictOpen] = React.useState(false)
+  const [mapOpen, setMapOpen] = React.useState(false)
+  const [mapKey, setMapKey] = React.useState(0)
 
   React.useEffect(() => {
     setInternalDistrict(formatDistrictTitle(activeLegislator.district))
@@ -138,6 +141,7 @@ export function PromptInput({
   }
 
   return (
+    <>
     <form ref={formRef} onSubmit={onSubmit}>
       <InputGroup className={cn("bg-background border border-foreground/20 dark:border-foreground/20 shadow-md", className)}>
         <InputGroupTextarea
@@ -320,7 +324,9 @@ export function PromptInput({
                 size="sm"
                 variant="outline"
                 onClick={() => {
-                  // Map interaction
+                  // New key so the drawer starts from the current district each time.
+                  setMapKey((k) => k + 1)
+                  setMapOpen(true)
                 }}
                 className="h-8 gap-1.5 rounded-full px-3 text-xs font-normal text-muted-foreground hover:text-foreground"
                 title="View District Map"
@@ -363,5 +369,15 @@ export function PromptInput({
         </InputGroupAddon>
       </InputGroup>
     </form>
+    {/* Outside the form so events from the drawer never reach it. */}
+    <ExploreDistrictsDrawer
+      key={mapKey}
+      open={mapOpen}
+      onOpenChange={setMapOpen}
+      initialDistrict={selectedDistrict}
+      // Keep the prompt's district in sync with what's chosen on the map.
+      onDistrictChange={handleSelectDistrict}
+    />
+    </>
   )
 }

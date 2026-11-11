@@ -1,26 +1,33 @@
 import { mutation, query, internalMutation } from "./_generated/server"
 import { v } from "convex/values"
+import { paginationOptsValidator, paginationResultValidator } from "convex/server"
 import type { Id } from "./_generated/dataModel"
 import { internal, components } from "./_generated/api"
 import { createThread, saveMessage } from "@convex-dev/agent"
 
+const conversationValidator = v.object({
+  _id: v.id("conversations"),
+  _creationTime: v.number(),
+  title: v.string(),
+  district: v.optional(v.string()),
+  folderId: v.optional(v.id("folders")),
+  threadId: v.optional(v.string()),
+  isPinned: v.optional(v.boolean()),
+  userId: v.optional(v.id("users")),
+  thinking: v.optional(v.boolean()),
+})
+
+/**
+ * Recent conversations (not in a folder), newest first, one page at a time.
+ * Paginated per the Convex pagination docs so the sidebar can keep loading
+ * older conversations with `usePaginatedQuery` instead of a fixed `.take(20)`.
+ */
 export const list = query({
   args: {
     userId: v.optional(v.id("users")),
+    paginationOpts: paginationOptsValidator,
   },
-  returns: v.array(
-    v.object({
-      _id: v.id("conversations"),
-      _creationTime: v.number(),
-      title: v.string(),
-      district: v.optional(v.string()),
-      folderId: v.optional(v.id("folders")),
-      threadId: v.optional(v.string()),
-      isPinned: v.optional(v.boolean()),
-      userId: v.optional(v.id("users")),
-      thinking: v.optional(v.boolean()),
-    })
-  ),
+  returns: paginationResultValidator(conversationValidator),
   handler: async (ctx, args) => {
     let targetUserId = args.userId
     if (!targetUserId) {
@@ -34,7 +41,7 @@ export const list = query({
     }
 
     if (!targetUserId) {
-      return []
+      return { page: [], isDone: true, continueCursor: "" }
     }
 
     return await ctx.db
@@ -43,7 +50,7 @@ export const list = query({
         q.eq("userId", targetUserId).eq("folderId", undefined)
       )
       .order("desc")
-      .take(20)
+      .paginate(args.paginationOpts)
   },
 })
 
