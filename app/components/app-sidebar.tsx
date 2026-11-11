@@ -89,7 +89,7 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useQuery, useMutation } from "convex/react"
+import { useQuery, useMutation, usePaginatedQuery } from "convex/react"
 import { api } from "@/convex/_generated/api"
 import type { Id } from "@/convex/_generated/dataModel"
 import { cn } from "@/lib/utils"
@@ -550,6 +550,9 @@ interface DroppableRecentsSectionProps {
         title: string
       }>
     | undefined
+  /** `usePaginatedQuery` status for the recents list. */
+  status: "LoadingFirstPage" | "CanLoadMore" | "LoadingMore" | "Exhausted"
+  onLoadMore: () => void
   activeConv: DraggedConversationData | null
   currentPathname: string
   onDeleteConversation: (id: Id<"conversations">, isActive: boolean) => Promise<void>
@@ -557,6 +560,8 @@ interface DroppableRecentsSectionProps {
 
 function DroppableRecentsSection({
   recents,
+  status,
+  onLoadMore,
   activeConv,
   currentPathname,
   onDeleteConversation,
@@ -571,6 +576,26 @@ function DroppableRecentsSection({
   // Eligible to drop here if the dragged item is currently inside a folder
   const isDropTarget = isOver && activeConv && activeConv.currentFolderId !== undefined
 
+  // Infinite scroll: load the next page when the sentinel below the list
+  // scrolls into view (inside the sidebar's scrolling content).
+  const sentinelRef = React.useRef<HTMLDivElement>(null)
+  const onLoadMoreRef = React.useRef(onLoadMore)
+  React.useEffect(() => {
+    onLoadMoreRef.current = onLoadMore
+  }, [onLoadMore])
+  React.useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!sentinel || status !== "CanLoadMore") return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) onLoadMoreRef.current()
+      },
+      { rootMargin: "0px 0px 120px 0px" }
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [status])
+
   return (
     <SidebarGroup ref={setNodeRef}>
       <SidebarGroupLabel>Recents</SidebarGroupLabel>
@@ -582,7 +607,7 @@ function DroppableRecentsSection({
         )}
       >
         <SidebarMenu>
-          {recents === undefined ? (
+          {recents === undefined || status === "LoadingFirstPage" ? (
             <div className="flex flex-col gap-1 px-2 py-1">
               <Skeleton className="h-7 w-full rounded-md" />
               <Skeleton className="h-7 w-full rounded-md" />
@@ -604,7 +629,14 @@ function DroppableRecentsSection({
               )
             })
           )}
+          {status === "LoadingMore" && (
+            <div className="flex flex-col gap-1 px-2 py-1">
+              <Skeleton className="h-7 w-full rounded-md" />
+              <Skeleton className="h-7 w-full rounded-md" />
+            </div>
+          )}
         </SidebarMenu>
+        {status === "CanLoadMore" && <div ref={sentinelRef} aria-hidden="true" className="h-px" />}
       </SidebarGroupContent>
     </SidebarGroup>
   )
@@ -634,9 +666,15 @@ export function AppSidebar({
     }
   }, [dbUsers, initLegislators])
 
-  const recents = useQuery(
+  const RECENTS_PAGE_SIZE = 20
+  const {
+    results: recents,
+    status: recentsStatus,
+    loadMore: loadMoreRecents,
+  } = usePaginatedQuery(
     api.conversations.list,
-    currentUser._id ? { userId: currentUser._id } : "skip"
+    currentUser._id ? { userId: currentUser._id } : "skip",
+    { initialNumItems: RECENTS_PAGE_SIZE }
   )
   const projectFolders = useQuery(
     api.folders.listWithConversations,
@@ -955,6 +993,8 @@ export function AppSidebar({
             {/* Recents Group (placed below Projects, droppable to move out of folders) */}
             <DroppableRecentsSection
               recents={recents}
+              status={recentsStatus}
+              onLoadMore={() => loadMoreRecents(RECENTS_PAGE_SIZE)}
               activeConv={activeConv}
               currentPathname={pathname}
               onDeleteConversation={handleDeleteConversation}

@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { MarkdownRenderer } from "@/components/markdown-renderer"
 import { AgentTrace } from "@/components/agent-trace"
-import { Sources } from "@/components/sources"
+import { Sources, extractCitations } from "@/components/sources"
 import {
   MessageScrollerProvider,
   MessageScroller,
@@ -482,7 +482,10 @@ export default function ConversationPage({
                                   <span>Analyzing Hawaii legislative data...</span>
                                 </div>
                               ) : message.content ? (
-                                <MarkdownRenderer content={message.content}>
+                                <MarkdownRenderer
+                                  content={message.content}
+                                  citations={extractCitations((message as any).parts)}
+                                >
                                   {isStreaming && (
                                     <span
                                       aria-hidden="true"

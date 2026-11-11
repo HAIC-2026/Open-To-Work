@@ -11,6 +11,7 @@ import {
   TraceLine,
   TraceTitle,
 } from "@/components/ui/trace"
+import { Badge } from "@/components/ui/badge"
 import { cn } from "cn"
 
 export interface SourceItem {
@@ -22,6 +23,94 @@ export interface SourceItem {
   organization?: string
   coverage?: string
   direct_download_url?: string
+  /** Citation number from cite_sources, used by inline [n] markers. */
+  number?: number
+  /** Data year or vintage, e.g. "2020–2024 ACS 5-year". */
+  year?: string
+  /** Geography the figures describe, e.g. "State House District 49". */
+  geography?: string
+  /** True when figures were estimated/apportioned from other geographies. */
+  apportioned?: boolean
+  apportionmentMethod?: string
+}
+
+/** Shape of a cite_sources result as stored on a message part. */
+interface CitedSourceOutput {
+  number?: number
+  id?: string
+  datasetId?: string
+  url?: string
+  direct_download_url?: string
+  title?: string
+  reason?: string
+  organization?: string
+  source?: string
+  coverage?: string
+  year?: string
+  geography?: string
+  apportioned?: boolean
+  apportionmentMethod?: string
+}
+
+interface ToolPartLike {
+  type?: unknown
+  toolName?: unknown
+  output?: { sources?: unknown }
+}
+
+const isCiteSourcesPart = (part: unknown): part is ToolPartLike => {
+  if (!part || typeof part !== "object") return false
+  const p = part as ToolPartLike
+  return (
+    p.type === "tool-cite_sources" ||
+    p.toolName === "cite_sources" ||
+    (p.type === "dynamic-tool" && p.toolName === "cite_sources")
+  )
+}
+
+/**
+ * Numbered citations for a message: the verified sources from its latest
+ * cite_sources call, ordered by citation number.
+ */
+export function extractCitations(parts?: unknown[]): SourceItem[] {
+  if (!Array.isArray(parts)) return []
+  const last = [...parts]
+    .reverse()
+    .find((p): p is ToolPartLike => isCiteSourcesPart(p) && Array.isArray(p.output?.sources))
+  if (!last) return []
+  return (last.output?.sources as CitedSourceOutput[])
+    .filter((item) => item && (item.url || item.direct_download_url))
+    .map((item, i) => ({
+      id: item.id || item.datasetId,
+      datasetId: item.datasetId || item.id,
+      url: (item.url || item.direct_download_url) as string,
+      title: item.title,
+      reason: item.reason,
+      organization: item.organization || item.source,
+      coverage: item.coverage,
+      direct_download_url: item.direct_download_url,
+      number: typeof item.number === "number" ? item.number : i + 1,
+      year: item.year,
+      geography: item.geography,
+      apportioned: item.apportioned,
+      apportionmentMethod: item.apportionmentMethod,
+    }))
+    .sort((a, b) => (a.number ?? 0) - (b.number ?? 0))
+}
+
+/** One-line "year · geography · apportioned" description of a citation. */
+export function describeCitation(source: SourceItem): string {
+  return [
+    source.year,
+    source.geography,
+    source.apportioned
+      ? `Estimated for the district${source.apportionmentMethod ? ` (${source.apportionmentMethod})` : ""}`
+      : source.geography
+        ? "Published for this geography"
+        : null,
+  ]
+    .filter(Boolean)
+    .join(" · ")
 }
 
 export interface SourcesProps extends React.ComponentProps<"div"> {
@@ -190,31 +279,10 @@ export function extractSources(
     }
   }
 
-  // 2. Check for explicit semantic model attribution via cite_sources tool
-  const citeSourcesPart = Array.isArray(parts)
-    ? parts.find(
-        (part) =>
-          part &&
-          (part.type === "tool-cite_sources" ||
-            part.toolName === "cite_sources" ||
-            (part.type === "dynamic-tool" && part.toolName === "cite_sources"))
-      )
-    : undefined
-
-  if (citeSourcesPart?.output?.sources && Array.isArray(citeSourcesPart.output.sources)) {
-    for (const item of citeSourcesPart.output.sources) {
-      if (!item) continue
-      const url = item.url || item.direct_download_url
-      addSource(url, item.title, {
-        id: item.id || item.datasetId,
-        datasetId: item.datasetId || item.id,
-        reason: item.reason,
-        organization: item.organization || item.source,
-        coverage: item.coverage,
-        direct_download_url: item.direct_download_url,
-      })
-    }
-
+  // 2. Explicit semantic model attribution via cite_sources (numbered citations)
+  const citations = extractCitations(parts)
+  if (citations.length > 0) {
+    for (const item of citations) addSource(item.url, item.title, item)
     return Array.from(sourceMap.values())
   }
 
@@ -317,9 +385,13 @@ export function Sources({
 
   if (sources.length === 0) return null
 
+  // Numbered citations carry year/geography/apportionment details that the
+  // inline [n] markers point to, so show the list open for those answers.
+  const hasCitations = sources.some((s) => s.number !== undefined)
+
   return (
     <Trace className={cn("w-full pt-1", className)} {...props}>
-      <TraceCollapsible defaultOpen={false}>
+      <TraceCollapsible defaultOpen={hasCitations}>
         <TraceCollapsibleTrigger>
           <TraceLine>
             <TraceIcon>
@@ -333,6 +405,8 @@ export function Sources({
         <TraceCollapsibleContent>
           <div className="flex flex-col gap-1.5 pt-1">
             {sources.map((source, idx) => {
+              const vintage = [source.year, source.geography].filter(Boolean).join(" · ")
+              const isCitation = source.apportioned !== undefined
               const subtitle =
                 source.reason ||
                 [
@@ -349,17 +423,48 @@ export function Sources({
                   href={source.url || source.direct_download_url || "#"}
                   target="_blank"
                   rel="noreferrer"
-                  className="group/dataset flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs transition-colors hover:border-border hover:bg-muted/70"
+                  className={cn(
+                    "group/dataset flex justify-between gap-3 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs transition-colors hover:border-border hover:bg-muted/70",
+                    isCitation ? "items-start" : "items-center"
+                  )}
                 >
-                  <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                  <div
+                    className={cn(
+                      "flex min-w-0 flex-1 gap-2.5",
+                      isCitation ? "items-start" : "items-center"
+                    )}
+                  >
+                    {source.number !== undefined && (
+                      <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-md bg-muted px-1 font-mono text-[11px] font-semibold text-muted-foreground">
+                        {source.number}
+                      </span>
+                    )}
                     <SourceFavicon url={source.url || source.direct_download_url} />
                     <div className="flex min-w-0 flex-col gap-0.5">
                       <span className="truncate font-medium text-foreground group-hover/dataset:text-primary">
                         {source.title ?? getHostname(source.url)}
                       </span>
                       {subtitle && (
-                        <span className="truncate text-muted-foreground">
+                        <span
+                          className={cn(
+                            "text-muted-foreground",
+                            isCitation ? "line-clamp-2" : "truncate"
+                          )}
+                        >
                           {subtitle}
+                        </span>
+                      )}
+                      {isCitation && (
+                        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <Badge variant={source.apportioned ? "secondary" : "outline"}>
+                            {source.apportioned ? "Estimated for district" : "Published for this geography"}
+                          </Badge>
+                          {vintage && <span className="text-muted-foreground">{vintage}</span>}
+                        </div>
+                      )}
+                      {source.apportioned && source.apportionmentMethod && (
+                        <span className="text-muted-foreground">
+                          Method: {source.apportionmentMethod}
                         </span>
                       )}
                     </div>

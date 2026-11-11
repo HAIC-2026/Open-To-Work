@@ -1,6 +1,7 @@
 import { mutation, query } from "./_generated/server"
 import { v } from "convex/values"
 import type { Id } from "./_generated/dataModel"
+import { LEGISLATOR_ROSTER } from "./legislatorRoster"
 
 export const list = query({
   args: {},
@@ -73,18 +74,10 @@ export const initLegislators = mutation({
     defaultUserId: v.id("users"),
   }),
   handler: async (ctx) => {
-    const expectedDistricts: Array<{ name: string; district: string }> = [
-      ...Array.from({ length: 51 }, (_, i) => ({
-        name: `Representative District ${i + 1}`,
-        district: `house-district-${i + 1}`,
-      })),
-      ...Array.from({ length: 25 }, (_, i) => ({
-        name: `Senator District ${i + 1}`,
-        district: `senate-district-${i + 1}`,
-      })),
-    ]
-
-    for (const item of expectedDistricts) {
+    // Real legislators (see legislatorRoster.ts). Rows are matched by district,
+    // so existing user IDs (and their conversations/folders) are kept, and
+    // names/photos are refreshed when the roster changes.
+    for (const item of LEGISLATOR_ROSTER) {
       const existing = await ctx.db
         .query("users")
         .withIndex("by_district", (q) => q.eq("district", item.district))
@@ -94,8 +87,10 @@ export const initLegislators = mutation({
         await ctx.db.insert("users", {
           name: item.name,
           district: item.district,
-          photoUrl: "",
+          photoUrl: item.photoUrl,
         })
+      } else if (existing.name !== item.name || existing.photoUrl !== item.photoUrl) {
+        await ctx.db.patch(existing._id, { name: item.name, photoUrl: item.photoUrl })
       }
     }
 
