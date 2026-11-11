@@ -123,6 +123,9 @@ export const getMessages = query({
 export const create = mutation({
   args: {
     title: v.string(),
+    // First user message. Defaults to `title` when omitted, so callers can
+    // pass a short sidebar title with a longer preset prompt.
+    prompt: v.optional(v.string()),
     userId: v.optional(v.id("users")),
     district: v.optional(v.string()),
     folderId: v.optional(v.id("folders")),
@@ -133,6 +136,7 @@ export const create = mutation({
     if (!trimmedTitle) {
       throw new Error("Conversation title cannot be empty")
     }
+    const trimmedPrompt = args.prompt?.trim() || trimmedTitle
 
     let targetUserId = args.userId
     if (!targetUserId) {
@@ -172,7 +176,7 @@ export const create = mutation({
     // Save first user prompt message into the agent thread
     const { messageId } = await saveMessage(ctx, components.agent, {
       threadId,
-      prompt: trimmedTitle,
+      prompt: trimmedPrompt,
     })
 
     // Trigger the background LLM response stream
