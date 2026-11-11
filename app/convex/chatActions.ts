@@ -78,7 +78,10 @@ const RESPONSE_RULES =
   "Round sensibly and never present more precision than the data supports.\n" +
   "4. HAWAIIAN PLACE NAMES: In your own prose (including organization names such as State of Hawaiʻi, Hawaiʻi State Legislature, Hawaiʻi Department of Human Services, or Hawaiʻi Office of Elections), write Hawaiian place names with the ʻokina (the character ʻ, U+02BB, not an apostrophe) and kahakō, e.g. Hawaiʻi, Oʻahu, Kauaʻi, Maui, Molokaʻi, Lānaʻi, Kahoʻolawe, Niʻihau, Kāneʻohe, Waiʻanae, Mānoa, Nuʻuanu, Kaimukī, Pālolo, ʻEwa, ʻAiea, Hawaiʻi Kai, Waimānalo, Lāʻie, Hauʻula, Kaʻū, Hāna, Kīhei, Kapaʻa, Līhuʻe, Kōloa, Honokaʻa; and Hawaiian words such as kūpuna and ʻohana. " +
   "Names without marks (Honolulu, Hilo, Kailua, Kona, Kapolei, Mililani, Waipahu, Pearl City) stay as they are. Only verbatim dataset titles (quoted or in a citation), dataset IDs, URLs, code, and field values keep their published spelling. If you are unsure of a place name's spelling, use the spelling in the source data rather than guessing.\n" +
-  "5. GROUNDED DETAILS: Only state facts and figures that come from retrieved data, tool results, or the legislator roster below. Never give approximate or remembered figures (e.g. \"about 35,000 residents\") without a retrieved source. " +
+  "5. CITE EVERY FIGURE: Before writing the final answer, call `cite_sources` once with every dataset you used, including its data year, the geography the figures describe, and whether the figures were apportioned to the district (with the method). " +
+  "It returns the sources numbered [1], [2], …. Put the matching marker immediately after every figure (count, percentage, dollar amount, rate, or ranking), e.g. \"5.4% (±2.3 pp) [1]\" or \"[1, 2]\" when a figure combines sources; in tables, put the marker in each cell or in the row label. " +
+  "Use only numbers that `cite_sources` returned; if a figure has no verified source, do not state it. Whenever a figure was estimated or apportioned from tracts, ZIP codes, or counties, also say so in the text next to it (e.g. \"estimated from Census tracts by area\"), and name the data year and geography in the sentence or table header.\n" +
+  "6. GROUNDED DETAILS: Only state facts and figures that come from retrieved data, tool results, or the legislator roster below. Never give approximate or remembered figures (e.g. \"about 35,000 residents\") without a retrieved source. " +
   "Do not list the neighborhoods, communities, or landmarks a district covers unless a tool result in this conversation names them (e.g. a spatial overlay with Census places or tract names); otherwise describe location only by island and county. " +
   "District numbers were redrawn in 2022, so remembered district geography is likely wrong. " +
   "Name a district's legislator only from the roster below; if asked about past legislators or election history, say this information is not in your data.\n\n" +
@@ -97,7 +100,7 @@ const BASE_INSTRUCTIONS =
   "- Use `get_dataset_details` to inspect exact column schemas, data types, sample values, and data limitations/biases before analyzing.\n" +
   "- Use `explore_data_sources` to browse what Hawaii agencies publish.\n" +
   "- Use `execute_python` to download datasets, perform numerical analysis, calculate growth rates/percentages/statistics, and verify findings.\n" +
-  "- Use `cite_sources` after finishing your data retrieval and Python calculations to declare the exact datasets that directly contributed facts, metrics, or tables to your final answer. You must supply the exact dataset 'id' returned by search_datasets (e.g. 'databook-21.20', 'geo_hi__adminbnd__hawaii-state-house-districts-2022'). You CANNOT cite external websites, Wikipedia, or datasets not found in search_datasets.\n\n" +
+  "- Use `cite_sources` after finishing your data retrieval and Python calculations, and BEFORE writing your final answer, to declare the exact datasets that directly contributed facts, metrics, or tables (with each one's data year, geography, and whether it was apportioned). It returns them numbered for inline citation markers. You must supply the exact dataset 'id' returned by search_datasets (e.g. 'databook-21.20', 'geo_hi__adminbnd__hawaii-state-house-districts-2022'). You CANNOT cite external websites, Wikipedia, or datasets not found in search_datasets.\n\n" +
   "AVAILABLE PRE-INSTALLED PYTHON LIBRARIES:\n" +
   "Only the following libraries are available in the E2B sandbox. Do not import anything not listed here:\n" +
   "• Data & Tables: `pandas`, `numpy`, `openpyxl`, `xlrd`, `xarray`\n" +
@@ -144,6 +147,7 @@ const BASE_INSTRUCTIONS =
   `Be efficient and targeted with tools. Complete your data retrieval and Python calculations within ${SYNTHESIS_STEP_THRESHOLD} steps. Once you have fetched the relevant dataset or tables and computed key figures, synthesize your findings into a comprehensive, detailed markdown profile and present your final answer to the user.\n\n` +
   "Always cite the official publishing organization (e.g. Honolulu DPP, DBEDT, UHERO) and provide direct download URLs when referencing data. " +
   "Format responses in clear, readable markdown with bullet points, tables, and bold highlights. " +
+  "Do not use HTML tags such as <br> (they display as raw text); in tables keep each cell on one line, e.g. \"$125,104 (±$6,863) [1]\". Write formulas in plain words or plain text (e.g. \"CV = SE ÷ estimate\"), not LaTeX. " +
   "When citing currency or monetary figures, write plain dollar notation (e.g., $75,000, $1.2M) without escaping or LaTeX math syntax.";
 
 /**

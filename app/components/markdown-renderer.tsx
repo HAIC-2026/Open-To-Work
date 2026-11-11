@@ -17,20 +17,35 @@ import {
   CodeBlockContent,
 } from "@/components/ui/code-block"
 import { cn } from "@/lib/utils"
+import { CitationMarkers, rehypeCitations } from "@/components/citation-marker"
+import type { SourceItem } from "@/components/sources"
 
 interface MarkdownRendererProps {
   content: string
   className?: string
   children?: React.ReactNode
+  /** Numbered sources from cite_sources; `[n]` markers become citation links. */
+  citations?: SourceItem[]
 }
 
-export function MarkdownRenderer({ content, className, children }: MarkdownRendererProps) {
+export function MarkdownRenderer({ content, className, children, citations = [] }: MarkdownRendererProps) {
   return (
     <div className={cn("text-sm md:text-base leading-relaxed text-foreground", className)}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: false }]]}
-        rehypePlugins={[[rehypeKatex, { throwOnError: false }]]}
+        rehypePlugins={[
+          [rehypeKatex, { throwOnError: false }],
+          // After KaTeX so math output is skipped.
+          [rehypeCitations, { count: citations.length }],
+        ]}
         components={{
+          sup: ({ node, children: supChildren, ...props }) => {
+            const spec = node?.properties?.dataCitations
+            if (typeof spec === "string" && spec) {
+              return <CitationMarkers numbers={spec.split(",").map(Number)} citations={citations} />
+            }
+            return <sup {...props}>{supChildren}</sup>
+          },
           hr: () => <Separator className="my-6 bg-border" />,
           h1: ({ children: hChildren }) => (
             <h1 className="scroll-m-20 text-xl font-bold tracking-tight mt-6 mb-2 text-foreground first:mt-0">

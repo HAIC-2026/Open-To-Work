@@ -269,7 +269,8 @@ export const exploreDataSources = createTool({
  */
 export const citeSources = createTool({
   description:
-    "Explicitly cite and register the exact Hawaii datasets from your previous search_datasets results that directly substantiated facts, calculations, or tables in your final answer. You MUST provide the exact dataset 'id' returned by search_datasets (e.g. 'databook-21.20', 'dbedt_warehouse-construction-and-housing-home-sales-and-prices-board-of-realtors-data', or 'geo_hi__adminbnd__hawaii-state-house-districts-2022'). You CANNOT invent external URLs, Wikipedia links, or cite datasets that were not returned by search_datasets.",
+    "Call this BEFORE writing your final answer to register the exact Hawaii datasets from your previous search_datasets results that supplied facts, calculations, or tables. You MUST provide the exact dataset 'id' returned by search_datasets (e.g. 'databook-21.20', 'dbedt_warehouse-construction-and-housing-home-sales-and-prices-board-of-realtors-data', or 'geo_hi__adminbnd__hawaii-state-house-districts-2022'). You CANNOT invent external URLs, Wikipedia links, or cite datasets that were not returned by search_datasets. " +
+    "Returns the verified sources numbered 1..n in the order you listed them; in the answer, put the matching marker (e.g. [1] or [1, 2]) right after every figure taken from that source.",
   inputSchema: z.object({
     sources: z
       .array(
@@ -284,6 +285,27 @@ export const citeSources = createTool({
             .describe(
               "Brief 1-sentence note of what specific metric, calculation, or fact this dataset supplied"
             ),
+          year: z
+            .string()
+            .describe(
+              "Data year or vintage of the figures used, e.g. '2020–2024 ACS 5-year', '2025', 'FY2024', or '2022 plan' for boundaries"
+            ),
+          geography: z
+            .string()
+            .describe(
+              "Geography the figures describe, e.g. 'State House District 49', 'Honolulu County', 'State of Hawaiʻi', or 'Census tracts in House District 49'"
+            ),
+          apportioned: z
+            .boolean()
+            .describe(
+              "true if the figures were estimated or apportioned to the district from other geographies (tracts, ZIP codes, county); false if published directly for that geography"
+            ),
+          apportionmentMethod: z
+            .string()
+            .optional()
+            .describe(
+              "When apportioned is true: how, e.g. 'area-weighted from 2020 Census tracts' or 'whole tracts with ≥50% of area in the district'"
+            ),
         })
       )
       .describe(
@@ -291,11 +313,13 @@ export const citeSources = createTool({
       ),
   }),
   execute: async (_ctx, args, options?: any) => {
-    const verifiedSources: any[] = [];
+    // Keyed by input position so numbering follows the order the agent listed
+    // them in, not the order the verification requests happen to finish.
+    const verifiedByIndex = new Map<number, { title?: string } & Record<string, unknown>>();
     const rejectedSources: any[] = [];
 
     await Promise.all(
-      args.sources.map(async (s) => {
+      args.sources.map(async (s, index) => {
         const cleanId = (s.datasetId || "").trim();
         if (!cleanId) return;
 
@@ -317,7 +341,7 @@ export const citeSources = createTool({
           }
 
           const d = await res.json();
-          verifiedSources.push({
+          verifiedByIndex.set(index, {
             id: d.id,
             datasetId: d.id,
             title: d.title,
@@ -326,6 +350,10 @@ export const citeSources = createTool({
             url: d.source_url || d.direct_download_url || `https://api.datatrove.ai/api/dataset/${d.id}`,
             direct_download_url: d.direct_download_url,
             reason: s.reason,
+            year: s.year,
+            geography: s.geography,
+            apportioned: s.apportioned,
+            apportionmentMethod: s.apportioned ? s.apportionmentMethod : undefined,
             coverage:
               d.start_year && d.end_year
                 ? `${d.start_year}–${d.end_year}`
@@ -342,10 +370,15 @@ export const citeSources = createTool({
       })
     );
 
+    const verifiedSources = [...verifiedByIndex.entries()]
+      .sort(([a], [b]) => a - b)
+      .map(([, source], i) => ({ number: i + 1, ...source }));
+
     return {
       success: verifiedSources.length > 0,
       count: verifiedSources.length,
       sources: verifiedSources,
+      citationGuide: verifiedSources.map((v) => `[${v.number}] ${v.title}`).join("; "),
       rejected: rejectedSources.length > 0 ? rejectedSources : undefined,
     };
   },
