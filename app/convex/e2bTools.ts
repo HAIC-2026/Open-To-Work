@@ -45,7 +45,7 @@ async function runScriptInSandbox(
 export const executePython = createTool({
   description:
     "Execute Python code in an isolated E2B Linux sandbox environment. " +
-    "Pre-installed data science packages include: pandas, numpy, scipy, scikit-learn, requests, openpyxl, xlrd, beautifulsoup4, lxml, matplotlib, seaborn, plotly, sympy, and pydantic. " +
+    "Pre-installed data science packages include: pandas, numpy, scipy, scikit-learn, requests, openpyxl, xlrd, beautifulsoup4, lxml, matplotlib, seaborn, plotly, sympy, pydantic, and the geospatial stack geopandas, shapely, pyproj, and pyogrio. " +
     "Has outbound internet access to download datasets directly from Hawaii open data and Census URLs using requests.get(url). " +
     "You cannot do any pip install in the sandbox environment.",
   inputSchema: z.object({

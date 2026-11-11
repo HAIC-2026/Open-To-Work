@@ -9,7 +9,9 @@
     "start": "next start",
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "template:build:dev": "tsx e2b-template/build.ts dev",
+    "template:build:prod": "tsx e2b-template/build.ts prod"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.114",
@@ -51,11 +53,13 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "e2b": "^2.63.0",
     "eslint": "^9",
     "eslint-config-next": "16.4.3",
     "prettier": "^3.9.10",
     "prettier-plugin-tailwindcss": "^0.8.1",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }
