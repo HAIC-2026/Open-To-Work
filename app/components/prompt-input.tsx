@@ -70,6 +70,9 @@ export interface PromptInputProps {
   showFolderSelect?: boolean
   selectedFolderId?: Id<"folders">
   onFolderChange?: (folderId?: Id<"folders">) => void
+  /** Controlled district. When omitted, the input manages it internally. */
+  selectedDistrict?: string
+  onDistrictChange?: (district: string) => void
 }
 
 export function PromptInput({
@@ -82,17 +85,26 @@ export function PromptInput({
   showFolderSelect = false,
   selectedFolderId: selectedFolderIdProp,
   onFolderChange,
+  selectedDistrict: selectedDistrictProp,
+  onDistrictChange,
 }: PromptInputProps) {
   const [text, setText] = React.useState("")
   const [activeLegislator] = useActiveLegislator()
-  const [selectedDistrict, setSelectedDistrict] = React.useState(() =>
+  const [internalDistrict, setInternalDistrict] = React.useState(() =>
     formatDistrictTitle(activeLegislator.district)
   )
   const [districtOpen, setDistrictOpen] = React.useState(false)
 
   React.useEffect(() => {
-    setSelectedDistrict(formatDistrictTitle(activeLegislator.district))
+    setInternalDistrict(formatDistrictTitle(activeLegislator.district))
   }, [activeLegislator.district])
+
+  const selectedDistrict = selectedDistrictProp ?? internalDistrict
+  const handleSelectDistrict = (district: string) => {
+    setInternalDistrict(district)
+    onDistrictChange?.(district)
+    setDistrictOpen(false)
+  }
 
   const projectFolders = useQuery(
     api.folders.listWithConversations,
@@ -278,10 +290,7 @@ export function PromptInput({
                             key={district}
                             value={district}
                             data-checked={selectedDistrict === district}
-                            onSelect={() => {
-                              setSelectedDistrict(district)
-                              setDistrictOpen(false)
-                            }}
+                            onSelect={() => handleSelectDistrict(district)}
                           >
                             {district}
                           </CommandItem>
@@ -294,10 +303,7 @@ export function PromptInput({
                             key={district}
                             value={district}
                             data-checked={selectedDistrict === district}
-                            onSelect={() => {
-                              setSelectedDistrict(district)
-                              setDistrictOpen(false)
-                            }}
+                            onSelect={() => handleSelectDistrict(district)}
                           >
                             {district}
                           </CommandItem>

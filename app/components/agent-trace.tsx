@@ -236,6 +236,20 @@ export function AgentTrace({
                   : isInterrupted
                   ? `Inspecting schema for ${dsId} (halted)`
                   : `Loaded schema for ${dsId}`
+              } else if (
+                rawToolName === "execute_python" &&
+                typeof input.purpose === "string" &&
+                input.purpose.trim()
+              ) {
+                // Older messages have no `purpose` and keep the generic labels.
+                const purpose = input.purpose.trim().replace(/[.\s]+$/, "")
+                title = isRunning
+                  ? `${purpose}...`
+                  : isInterrupted
+                  ? `${purpose} (halted)`
+                  : isError
+                  ? `Failed: ${purpose}`
+                  : purpose
               } else if (rawToolName === "cite_sources") {
                 const count = output?.count ?? output?.sources?.length ?? input?.sources?.length
                 title = isRunning
