@@ -29,7 +29,7 @@ import { PROGRAM_SOURCES, type ProgramSource } from "./programSources";
 const MAX_CHARS_PER_SOURCE = 25_000;
 const FETCH_TIMEOUT_MS = 30_000;
 /** Summaries longer than this are sent back once to be shortened. */
-const MAX_SUMMARY_WORDS = 350;
+const MAX_SUMMARY_WORDS = 400;
 const USER_AGENT = "Mozilla/5.0 (compatible; MohalaProgramRefresh/1.0)";
 
 // ─── Source text ─────────────────────────────────────────────────────────────
@@ -74,6 +74,8 @@ export function htmlToText(html: string): string {
     .replace(/<\/(td|th)>/gi, " | ")
     .replace(/<[^>]+>/g, " ");
   return decodeEntities(body)
+    // Some sites hide email addresses behind a script; the page source only has this placeholder.
+    .replace(/\[email(?:&#160;|\s|\u00a0)protected\]/gi, "")
     .split("\n")
     .map((line) => line.replace(/[ \t ]+/g, " ").trim())
     .filter((line, i, all) => line.length > 0 && line !== all[i - 1])
@@ -162,11 +164,12 @@ const SUMMARY_INSTRUCTIONS =
   "You condense official government program pages into a short reference brief that an AI assistant for Hawaiʻi state legislators will read before recommending the program. " +
   "Use ONLY the source text provided. Never add facts from general knowledge, and never guess.\n\n" +
   "Write 150–300 words of plain text with these labeled parts, each a few short sentences or bullets:\n" +
-  "What it provides:\nWho qualifies:\nIncome and asset limits:\nOther requirements:\nHow to apply:\nWhere and who administers it:\n\n" +
+  "What it provides:\nWho qualifies:\nIncome and asset limits:\nOther requirements:\nHow to apply:\nWhere and who administers it:\nContact:\n\n" +
   "Rules:\n" +
   "- End every sentence or bullet with the number of the source it came from, e.g. [1] or [1, 2]. Markers are only source numbers. Facts taken from the program details above the sources (name, agency, links) and \"Not stated in the sources.\" lines get no marker.\n" +
   "- Copy every number exactly as the source writes it, with its unit and the effective date or tax year the source gives. If the source spells a number in words, keep the words. Do not calculate new numbers.\n" +
-  "- Stay under 250 words.\n" +
+  "- Stay under 300 words.\n" +
+  "- Contact: give the phone numbers, TTY numbers, email addresses, office addresses and hours the sources list for THIS program or its administering office, each with what the source says it is for (e.g. \"Public Assistance Information Line, toll free: 1-855-643-1643\"). When the sources list local offices by island or county, give each office's phone with its area. Leave out unrelated lines that appear on the same page (e.g. abuse-reporting hotlines, interpreter request lines, civil-rights complaint numbers). Prefer the program's own office, clinic or agency numbers over department-wide lines in page footers; when a long list of clinics or offices is given, give one main number per island or county. Describe each line's purpose in plain words: if a source's label could be mistaken for a program name, say what it is (e.g. a tax office's \"General Assistance\" line is its general taxpayer help line). Leave out fax numbers, and leave out mailing addresses and ZIP codes when a phone number is given. Never include the non-discrimination, civil-rights or accessibility coordinator lines. Copy every number exactly. Keep this part when shortening. If the sources list no contact details, write \"Not stated in the sources.\"\n" +
   "- When the sources give figures for several years or effective dates, give only the most recent one, and label it in the source's own words (e.g. \"effective 10/1/2026\", \"2026 income limits\"); call something a tax year only if the source does.\n" +
   "- For tables by household size or number of children, give only the smallest and largest categories (e.g. household of 1 and of 8, or no children and three or more) and say the full table is on the source page. When a table has several income tiers, give only the tier the program uses for eligibility, or say the tiers are on the source page.\n" +
   "- If a part is not covered by the sources, write \"Not stated in the sources.\"\n" +
@@ -196,7 +199,7 @@ async function summarize(program: ProgramSource, sources: SourceResult[]): Promi
       { role: "assistant", content: first },
       {
         role: "user",
-        content: `That is ${words} words. Rewrite it in under 250 words, following the same rules: keep the most important eligibility facts, the [n] markers, and every number exactly as written.`,
+        content: `That is ${words} words. Rewrite it in under 300 words, following the same rules: keep the most important eligibility facts, the Contact part, the [n] markers, and every number exactly as written.`,
       },
     ],
   });
