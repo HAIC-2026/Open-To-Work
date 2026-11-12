@@ -86,6 +86,14 @@ function getToolMeta(toolName?: string) {
         doneText: "Fetched Census Bureau data",
         errorText: "Census data request failed",
       }
+    case "get_state_tax_collections":
+      return {
+        icon: Landmark,
+        label: "Census State Tax Collections",
+        runningText: "Fetching state tax collections...",
+        doneText: "Fetched state tax collections",
+        errorText: "State tax collections request failed",
+      }
     case "cite_sources":
       return {
         icon: Globe,
@@ -282,6 +290,20 @@ export function AgentTrace({
                   : input.variables?.length
                   ? `Fetched ${what} from the Census Bureau`
                   : `Listed ${what}`
+              } else if (
+                rawToolName === "get_state_tax_collections" &&
+                typeof input.startYear === "number"
+              ) {
+                const end = typeof input.endYear === "number" ? input.endYear : input.startYear
+                const years =
+                  end === input.startYear ? `FY${input.startYear}` : `FY${input.startYear}–FY${end}`
+                title = isRunning
+                  ? `Fetching Hawaiʻi state tax collections for ${years}...`
+                  : isInterrupted
+                  ? `Fetching Hawaiʻi state tax collections for ${years} (halted)`
+                  : isError || output?.error
+                  ? `State tax collections request for ${years} failed`
+                  : `Fetched Hawaiʻi state tax collections for ${years} from the Census Bureau`
               } else if (rawToolName === "cite_sources") {
                 const count = output?.count ?? output?.sources?.length ?? input?.sources?.length
                 title = isRunning
