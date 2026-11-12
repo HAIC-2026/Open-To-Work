@@ -354,3 +354,226 @@ export const getCensusTable = createTool({
     };
   },
 });
+
+// ─── State government tax collections ────────────────────────────────────────
+
+/**
+ * Census Bureau Annual Survey of State Government Tax Collections (STC), via the
+ * survey-specific `timeseries/govsstatetax` Census Data API dataset. Facts from
+ * the STC 2025 Technical Documentation: amounts are current dollars reported in
+ * thousands (not inflation-adjusted); they cover the state government only, not
+ * state plus local (so county property taxes are excluded); Hawaiʻi's fiscal year
+ * ends June 30; FY2025 was released April 2026 with revisions to FY2024 and FY2023.
+ */
+const STC_DATASET = `${API_BASE}/timeseries/govsstatetax`;
+const STC_DOCS_URL =
+  "https://www2.census.gov/programs-surveys/stc/technical-documentation/complete-technical-documentation/statetaxtechdoc2025.pdf";
+
+export interface StcYears {
+  startYear: number;
+  endYear: number;
+}
+
+/** Citation ID handed to cite_sources: "census:stc:2025" for one year, "census:stc:2016-2025" for a range. */
+export function stcCitationId({ startYear, endYear }: StcYears): string {
+  return startYear === endYear ? `census:stc:${startYear}` : `census:stc:${startYear}-${endYear}`;
+}
+
+export function parseStcCitationId(id: string): StcYears | null {
+  const m = /^census:stc:(\d{4})(?:-(\d{4}))?$/i.exec(id.trim());
+  if (!m) return null;
+  const startYear = Number(m[1]);
+  const endYear = m[2] ? Number(m[2]) : startYear;
+  return endYear >= startYear ? { startYear, endYear } : null;
+}
+
+function fiscalYearsLabel({ startYear, endYear }: StcYears): string {
+  return startYear === endYear ? `fiscal year ${startYear}` : `fiscal years ${startYear}–${endYear}`;
+}
+
+export function stcTitle(years: StcYears): string {
+  return `State Government Tax Collections: Hawaiʻi, ${fiscalYearsLabel(years)}`;
+}
+
+export function stcCoverage({ startYear, endYear }: StcYears): string {
+  return startYear === endYear
+    ? `Fiscal year ${startYear} (July ${startYear - 1}–June ${startYear})`
+    : `Fiscal years ${startYear}–${endYear} (July ${startYear - 1}–June ${endYear})`;
+}
+
+/**
+ * The detailed table on data.census.gov. One year uses the link form census.gov's
+ * STC tables page uses; a range uses the table URL from the table's Suggested
+ * Citation. Both show all states: a Hawaiʻi geography filter (`g=`) makes
+ * data.census.gov report "Data not available" for this table, so none is added.
+ */
+export function stcTableUrl({ startYear, endYear }: StcYears): string {
+  const base = "https://data.census.gov/table/GOVSSTATETAXTIMESERIES.GS00STATETAX";
+  return startYear === endYear ? `${base}?q=GOVSSTATETAX&nkd=time~${startYear}` : `${base}?q=GS00STATETAX`;
+}
+
+/** Symbols from the GS00STATETAX table's Data Notes on data.census.gov. */
+const STC_FLAGS: Record<string, string> = {
+  N: "not available or not comparable",
+  X: "not applicable",
+  Z: "represents zero or rounds to zero",
+};
+
+let stcYearsCache:Promise<{ first: number; last: number } | null> | null = null;
+
+/** Years the dataset covers, from its own catalog metadata (`temporal`, e.g. "2016/2025"). */
+export function fetchStcYears(signal?: AbortSignal): Promise<{ first: number; last: number } | null> {
+  if (stcYearsCache) return stcYearsCache;
+  const promise = fetch(`${STC_DATASET}.json`, { signal })
+    .then((res) => (res.ok ? res.json() : null))
+    .then((json: { dataset?: Array<{ temporal?: string }> } | null) => {
+      const m = /^(\d{4})\/(\d{4})$/.exec(json?.dataset?.[0]?.temporal ?? "");
+      return m ? { first: Number(m[1]), last: Number(m[2]) } : null;
+    })
+    .catch(() => null);
+  stcYearsCache = promise;
+  promise.then((y) => y === null && (stcYearsCache = null));
+  return promise;
+}
+
+export const getStateTaxCollections = createTool({
+  description:
+    "Fetch the State of Hawaiʻi government's tax collections by type of tax from the U.S. Census Bureau's Annual Survey of State Government Tax Collections (official Census Data API). " +
+    "Covers state fiscal years (Hawaiʻi's ends June 30) from 2016 to the latest release. " +
+    "Categories include general sales and gross receipts (item T09, which Census defines as taxes on all sales or all gross receipts — the category that fits Hawaiʻi's general excise tax), selective sales taxes (motor fuels, tobacco, alcohol, insurance premiums, public utilities, other), individual and corporate income, licenses, and death/gift and documentary taxes. " +
+    "STATEWIDE, STATE GOVERNMENT ONLY: there are no county or district figures, and county taxes such as property tax are not included. " +
+    "Returns amounts in dollars and ONE `citationId` covering every year requested (e.g. 'census:stc:2016-2025') to pass to cite_sources.",
+  inputSchema: z.object({
+    startYear: z.number().int().describe("First fiscal year, e.g. 2025 (FY2025 = July 2024–June 2025)"),
+    endYear: z
+      .number()
+      .int()
+      .optional()
+      .describe("Last fiscal year for a trend, e.g. 2025. Omit for a single year. At most 10 years."),
+    detail: z
+      .enum(["summary", "full"])
+      .optional()
+      .describe(
+        "'summary' = total taxes plus the 5 broad categories (sales & gross receipts, selective sales, income, license, other); 'full' = also every individual tax item. Defaults to 'full' for one year, 'summary' for a range."
+      ),
+    itemCodes: z
+      .array(z.string())
+      .optional()
+      .describe(
+        "Optional Census tax item codes to return only those items, e.g. ['T09'] general sales & gross receipts, ['T40','T41'] individual and corporate income, ['T13'] motor fuels. Overrides `detail`."
+      ),
+  }),
+  execute: async (_ctx, args, options?: { abortSignal?: AbortSignal }) => {
+    const signal = options?.abortSignal;
+    const startYear = args.startYear;
+    const endYear = args.endYear ?? startYear;
+
+    const range = await fetchStcYears(signal);
+    if (!range) return { error: "Could not read the Census state tax collections dataset's metadata. Try again." };
+    if (endYear < startYear) return { error: "endYear must be the same as or after startYear." };
+    if (startYear < range.first || endYear > range.last) {
+      return {
+        error:
+          `State tax collections are available for fiscal years ${range.first}–${range.last}.` +
+          (endYear > range.last ? ` FY${range.last + 1} has not been released yet.` : ""),
+      };
+    }
+    if (endYear - startYear + 1 > 10) return { error: "Request at most 10 fiscal years at a time." };
+
+    const key = process.env.CENSUS_API_KEY;
+    if (!key) return { error: "The Census Data API key (CENSUS_API_KEY) is not configured on the server." };
+
+    const itemFilter = args.itemCodes?.map((c) => c.trim().toUpperCase()).filter(Boolean);
+    const detail = args.detail ?? (startYear === endYear ? "full" : "summary");
+    const years = Array.from({ length: endYear - startYear + 1 }, (_, i) => startYear + i);
+    // GOVTYPE must be requested: without it the API returns no rows (HTTP 204).
+    const get = "AGG_DESC,AGG_DESC_LABEL,GOVTYPE,ITEM_CODE,ITEM_CODE_LABEL,AMOUNT,AMOUNT_F";
+
+    type Row = Record<string, string | null>;
+    const fetchYear = async (year: number): Promise<{ year: number; rows?: Row[]; error?: string }> => {
+      try {
+        const res = await fetch(
+          `${STC_DATASET}?get=${get}&for=state:${HAWAII_FIPS}&time=${year}&key=${encodeURIComponent(key)}`,
+          { signal }
+        );
+        const text = await res.text();
+        if (res.status === 204 || !text.trim()) return { year, error: "no data published for this year" };
+        // Never echo the request URL: it carries the key.
+        if (!res.ok) return { year, error: `Census Data API error (HTTP ${res.status}): ${text.slice(0, 200)}` };
+        const [header, ...data] = JSON.parse(text) as Array<Array<string | null>>;
+        return {
+          year,
+          rows: data.map((r) => Object.fromEntries(header.map((h, i) => [h as string, r[i]]))),
+        };
+      } catch (err) {
+        return { year, error: `Could not reach the Census Data API: ${err instanceof Error ? err.message : String(err)}` };
+      }
+    };
+
+    const fetched = await Promise.all(years.map(fetchYear));
+
+    const results = fetched.map(({ year, rows, error }) => {
+      if (!rows) return { fiscalYear: year, error };
+      const selected = rows.filter((r) => {
+        if (itemFilter && itemFilter.length > 0) return itemFilter.includes(String(r.ITEM_CODE));
+        return detail === "full" || r.ITEM_CODE === "AGG";
+      });
+      const label = (r: Row) => String(r.AGG_DESC_LABEL ?? "").replace(/^Taxes - /, "");
+      const flagText = (r: Row) => (r.AMOUNT_F ? STC_FLAGS[r.AMOUNT_F] ?? `flag '${r.AMOUNT_F}'` : undefined);
+      const hasAmount = (r: Row) => r.AMOUNT != null && r.AMOUNT !== "" && Number.isFinite(Number(r.AMOUNT));
+
+      // Items with no published amount are listed apart from the numbers, so a
+      // blank is never read as $0.
+      const noAmount = selected
+        .filter((r) => !hasAmount(r))
+        .map((r) => ({ itemCode: r.ITEM_CODE, category: label(r), censusStatus: flagText(r) ?? "no amount published" }));
+
+      const items = selected.filter(hasAmount).map((r) => {
+        const isAggregate = r.ITEM_CODE === "AGG";
+        const flag = flagText(r);
+        return {
+          code: r.AGG_DESC,
+          itemCode: isAggregate ? undefined : r.ITEM_CODE,
+          category: label(r),
+          level: isAggregate ? "category total" : "tax item",
+          amountDollars: Number(r.AMOUNT) * 1000,
+          note: flag ? `Census symbol: ${flag}` : undefined,
+        };
+      });
+
+      return {
+        fiscalYear: year,
+        items,
+        itemsWithNoAmount:
+          noAmount.length > 0
+            ? {
+                note: "Census published no amount for these items for Hawaiʻi. Do not show them as $0 or 0%; if you mention them, use the Census status given.",
+                items: noAmount,
+              }
+            : undefined,
+      };
+    });
+
+    const unmatched =
+      itemFilter && itemFilter.length > 0
+        ? itemFilter.filter((c) => !fetched.some((f) => f.rows?.some((r) => r.ITEM_CODE === c)))
+        : [];
+
+    const covered = { startYear, endYear };
+    return {
+      citationId: stcCitationId(covered),
+      title: stcTitle(covered),
+      sourceUrl: stcTableUrl(covered),
+      source: "U.S. Census Bureau, Annual Survey of State Government Tax Collections",
+      scope:
+        "State of Hawaiʻi government only (excludes county taxes such as property tax); statewide figures, not available by county or district.",
+      units:
+        "Current dollars (not adjusted for inflation), converted from the Census's published thousands. Fiscal years end June 30.",
+      caution:
+        "Census classifications can differ from the Hawaiʻi Department of Taxation's own reports because of how the Census defines 'state government'. These are full counts of collections (no sampling, so no margin of error). Each annual release (typically April) also revises the two prior fiscal years.",
+      documentation: STC_DOCS_URL,
+      unknownItemCodes: unmatched.length > 0 ? unmatched : undefined,
+      results,
+    };
+  },
+});

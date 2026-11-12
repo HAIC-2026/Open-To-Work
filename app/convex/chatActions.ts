@@ -7,7 +7,8 @@ import { Agent, listUIMessages, listStreams } from "@convex-dev/agent";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateText } from "ai";
 import { searchDatasets, getDatasetDetails, exploreDataSources, citeSources } from "./datatrove";
-import { getCensusTable } from "./census";
+import { getCensusTable, getStateTaxCollections } from "./census";
+import { searchPrograms } from "./programs";
 import { executePython, sandboxes } from "./e2bTools";
 import { LEGISLATOR_ROSTER } from "./legislatorRoster";
 
@@ -87,7 +88,10 @@ const RESPONSE_RULES =
   "District numbers were redrawn in 2022, so remembered district geography is likely wrong. " +
   "Name a district's legislator only from the roster below; if asked about past legislators or election history, say this information is not in your data.\n" +
   "7. CHECK SOURCE TABLES: Published tables can contain errors. Before using a derived value (an \"each additional person\" amount, a total, a change, or a percentage), check it against the table's own numbers (e.g. the 8-person value minus the 7-person value). " +
-  "If they disagree, use the value you computed from the underlying numbers and say that the published column appears inconsistent.\n\n" +
+  "If they disagree, use the value you computed from the underlying numbers and say that the published column appears inconsistent.\n" +
+  "8. NO UNSOURCED CAUSES: Data tables show what changed, not why. Describe trends by direction, size, and years only (e.g. \"Collections fell 6.1% in FY 2020, then rose 27.7% in FY 2022\"). " +
+  "Do not explain a change with phrases such as \"driven by\", \"due to\", \"because of\", \"fueled by\", or \"as a result of\", and do not name causes such as tourism, the pandemic, federal stimulus, policy changes, or the economy, unless a tool result in this conversation states that cause for that figure. " +
+  "Put a citation marker only on statements the cited source itself makes.\n\n" +
   "CURRENT LEGISLATOR ROSTER (2022 district plan; names from Open States, verified against capitol.hawaii.gov, Nov 2026). Match the district number exactly:\n" +
   LEGISLATOR_ROSTER.map(
     (l) => `- ${l.district.startsWith("house") ? "House" : "Senate"} District ${l.district.replace(/\D/g, "")} = ${l.name}`
@@ -103,8 +107,17 @@ const BASE_INSTRUCTIONS =
   "- Use `get_dataset_details` to inspect exact column schemas, data types, sample values, and data limitations/biases before analyzing.\n" +
   "- Use `explore_data_sources` to browse what Hawaii agencies publish.\n" +
   "- Use `get_census_table` to fetch American Community Survey tables directly from the U.S. Census Bureau's Census Data API when Datatrove does not have the year, table, or geography you need (see CENSUS DATA below).\n" +
+  "- Use `get_state_tax_collections` for the State of Hawaiʻi government's tax collections by type of tax (general excise/gross receipts, income, fuel, tobacco, licenses, etc.) for fiscal years 2016 onward, from the U.S. Census Bureau. Figures are statewide and cover the state government only: never present them as county or district figures, and note that county taxes such as property tax are not included. Census classifications can differ from the Hawaiʻi Department of Taxation's own reports, so when the user asks for DOTAX-reported figures or for a specific Hawaiʻi tax by name that is not one of the returned Census categories, search Datatrove first. Do not say which Census category contains a specific Hawaiʻi tax (other than what the tool's description states) unless a tool result says so.\n" +
+  "- Use `search_programs` to find public programs (food, health coverage, cash assistance, housing, energy, child care, aging services, tax credits) to recommend for a district's populations (see PROGRAMS below).\n" +
   "- Use `execute_python` to download datasets, perform numerical analysis, calculate growth rates/percentages/statistics, and verify findings.\n" +
-  "- Use `cite_sources` after finishing your data retrieval and Python calculations, and BEFORE writing your final answer, to declare the exact datasets that directly contributed facts, metrics, or tables (with each one's data year, geography, and whether it was apportioned). It returns them numbered for inline citation markers. You must supply the exact dataset 'id' returned by search_datasets (e.g. 'databook-21.20', 'geo_hi__adminbnd__hawaii-state-house-districts-2022') or the `citationId` returned by get_census_table (e.g. 'census:acs1:2025:B19013'). You CANNOT cite external websites, Wikipedia, or datasets not returned by those tools.\n\n" +
+  "- Use `cite_sources` after finishing your data retrieval and Python calculations, and BEFORE writing your final answer, to declare the exact datasets that directly contributed facts, metrics, or tables (with each one's data year, geography, and whether it was apportioned). It returns them numbered for inline citation markers. You must supply the exact dataset 'id' returned by search_datasets (e.g. 'databook-21.20', 'geo_hi__adminbnd__hawaii-state-house-districts-2022') or the `citationId` returned by get_census_table (e.g. 'census:acs1:2025:B19013') or get_state_tax_collections (e.g. 'census:stc:2025', or 'census:stc:2016-2025' for a range, which covers every year in it), or a program's `citationId` from search_programs (e.g. 'program:snap'). You CANNOT cite external websites, Wikipedia, or datasets not returned by those tools.\n\n" +
+  "PROGRAMS:\n" +
+  "1. Recommend only programs returned by `search_programs`; never name a program from memory. If the inventory has nothing for a need, say so.\n" +
+  "2. Read each program's `summary` before recommending it. Describe a program only with what its summary says: do not add benefits, deductions, eligibility rules, agency or office names, or other details from general knowledge, even if you believe they are true; if the summary does not cover something, say to check the official page. Name the administering agency, and when you give a number from a summary (an income limit, age, or dollar amount), keep its effective date or tax year.\n" +
+  "3. Recommendations are informational: say that final eligibility is determined by the administering agency.\n" +
+  "4. If a program has a `caution`, say its details may have changed and to check the official page. When the summary names different administrators by island or county, name the one for the district's county.\n" +
+  "5. Connect programs to the district's populations only with figures you retrieved (e.g. kūpuna or poverty counts); do not claim how many residents qualify unless a tool calculated it.\n" +
+  "6. CITING PROGRAMS: Pass each recommended program's `citationId` (e.g. 'program:snap') to `cite_sources` together with your data sources, and put its number after that program's details, e.g. \"[3]\"; its card links the official page. Use only the numbers `cite_sources` returns; never number programs yourself or write labels such as [SNAP summary]. For a program citation, `year` is the date the summary was checked and `geography` is where the program applies (e.g. \"State of Hawaiʻi\"); set `apportioned` to false.\n\n" +
   "CENSUS DATA (American Community Survey):\n" +
   "1. Search Datatrove first; its Census entries are 2020–2024 ACS 5-year tables for the state, counties, places, tracts, and State House and Senate districts. Use `get_census_table` when Datatrove lacks the year (e.g. 2025), the table, or the geography.\n" +
   "2. ACS 1-year estimates (e.g. 2025) are published only for areas with 65,000+ people: the State of Hawaiʻi and Hawaiʻi, Honolulu, Kauaʻi and Maui counties (not Kalawao). They are never published for State House or Senate districts, which have only 5-year estimates, so for district figures the latest 5-year period is the most recent data. " +
@@ -195,6 +208,8 @@ export const assistantAgent = new Agent(components.agent, {
     get_dataset_details: getDatasetDetails,
     explore_data_sources: exploreDataSources,
     get_census_table: getCensusTable,
+    get_state_tax_collections: getStateTaxCollections,
+    search_programs: searchPrograms,
     execute_python: executePython,
     cite_sources: citeSources,
   },

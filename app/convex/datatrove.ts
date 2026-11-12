@@ -3,9 +3,16 @@ import { z } from "zod";
 import {
   censusTableUrl,
   fetchCensusTableMeta,
+  fetchStcYears,
   parseCensusCitationId,
+  parseStcCitationId,
+  stcCoverage,
+  stcTableUrl,
+  stcTitle,
   surveyLabel,
 } from "./census";
+import { internal } from "./_generated/api";
+import type { Doc } from "./_generated/dataModel";
 
 const API_URL = (process.env.DATATROVE_API_URL as string).replace(/\/+$/, "");
 
@@ -275,7 +282,7 @@ export const exploreDataSources = createTool({
  */
 export const citeSources = createTool({
   description:
-    "Call this BEFORE writing your final answer to register the exact Hawaii datasets from your previous search_datasets results that supplied facts, calculations, or tables. You MUST provide the exact dataset 'id' returned by search_datasets (e.g. 'databook-21.20', 'dbedt_warehouse-construction-and-housing-home-sales-and-prices-board-of-realtors-data', or 'geo_hi__adminbnd__hawaii-state-house-districts-2022'), or the exact `citationId` returned by get_census_table (e.g. 'census:acs1:2025:B19013'). You CANNOT invent external URLs, Wikipedia links, or cite datasets that were not returned by those tools. " +
+    "Call this BEFORE writing your final answer to register the exact Hawaii datasets from your previous search_datasets results that supplied facts, calculations, or tables. You MUST provide the exact dataset 'id' returned by search_datasets (e.g. 'databook-21.20', 'dbedt_warehouse-construction-and-housing-home-sales-and-prices-board-of-realtors-data', or 'geo_hi__adminbnd__hawaii-state-house-districts-2022'), or the exact `citationId` returned by get_census_table (e.g. 'census:acs1:2025:B19013') or get_state_tax_collections (e.g. 'census:stc:2016-2025'), or a program's `citationId` from search_programs (e.g. 'program:snap'). You CANNOT invent external URLs, Wikipedia links, or cite datasets that were not returned by those tools. " +
     "Returns the verified sources numbered 1..n in the order you listed them; in the answer, put the matching marker (e.g. [1] or [1, 2]) right after every figure taken from that source.",
   inputSchema: z.object({
     sources: z
@@ -284,7 +291,7 @@ export const citeSources = createTool({
           datasetId: z
             .string()
             .describe(
-              "The exact unique dataset 'id' from search_datasets (e.g. 'databook-21.20', 'databook-13.26', 'geo_hi__adminbnd__hawaii-state-house-districts-2022'), or the `citationId` from get_census_table (e.g. 'census:acs1:2025:B19013'). Do NOT invent fake IDs or cite Wikipedia."
+              "The exact unique dataset 'id' from search_datasets (e.g. 'databook-21.20', 'databook-13.26', 'geo_hi__adminbnd__hawaii-state-house-districts-2022'), or the `citationId` from get_census_table (e.g. 'census:acs1:2025:B19013') or get_state_tax_collections (e.g. 'census:stc:2016-2025'), or a program's `citationId` from search_programs (e.g. 'program:snap'). Do NOT invent fake IDs or cite Wikipedia."
             ),
           reason: z
             .string()
@@ -318,7 +325,7 @@ export const citeSources = createTool({
         "List of official Hawaii datasets that directly supplied data points or tables in the final answer."
       ),
   }),
-  execute: async (_ctx, args, options?: any) => {
+  execute: async (ctx, args, options?: any) => {
     // Keyed by input position so numbering follows the order the agent listed
     // them in, not the order the verification requests happen to finish.
     const verifiedByIndex = new Map<number, { title?: string } & Record<string, unknown>>();
@@ -328,6 +335,68 @@ export const citeSources = createTool({
       args.sources.map(async (s, index) => {
         const cleanId = (s.datasetId || "").trim();
         if (!cleanId) return;
+
+        // Programs from search_programs: verified against the program inventory,
+        // linked to the program's official page.
+        if (/^program:/i.test(cleanId)) {
+          const slug = cleanId.slice("program:".length).trim().toLowerCase();
+          const program: Doc<"programs"> | null = slug
+            ? await ctx.runQuery(internal.programs.getBySlug, { slug })
+            : null;
+          if (!program || !program.summary) {
+            rejectedSources.push({
+              datasetId: cleanId,
+              error: `'${cleanId}' is not a program returned by search_programs (expected e.g. 'program:snap').`,
+            });
+            return;
+          }
+          const checked = program.summarizedAt
+            ? new Date(program.summarizedAt).toISOString().slice(0, 10)
+            : undefined;
+          verifiedByIndex.set(index, {
+            id: cleanId,
+            datasetId: cleanId,
+            kind: "program",
+            title: program.name,
+            organization: program.agency,
+            source: "program_inventory",
+            url: program.officialUrl,
+            reason: s.reason,
+            year: s.year,
+            geography: s.geography,
+            coverage: checked ? `Summary of official pages as of ${checked}` : undefined,
+          });
+          return;
+        }
+
+        // State tax collections from get_state_tax_collections: verified against
+        // the years the Census dataset's own metadata says it covers.
+        if (/^census:stc:/i.test(cleanId)) {
+          const parsed = parseStcCitationId(cleanId);
+          const range = parsed ? await fetchStcYears(options?.abortSignal) : null;
+          if (!parsed || !range || parsed.startYear < range.first || parsed.endYear > range.last) {
+            rejectedSources.push({
+              datasetId: cleanId,
+              error: `'${cleanId}' is not a citationId returned by get_state_tax_collections (expected e.g. 'census:stc:2025' or 'census:stc:2016-2025').`,
+            });
+            return;
+          }
+          verifiedByIndex.set(index, {
+            id: cleanId,
+            datasetId: cleanId,
+            title: stcTitle(parsed),
+            organization: "U.S. Census Bureau",
+            source: "census_api",
+            url: stcTableUrl(parsed),
+            reason: s.reason,
+            year: s.year,
+            geography: s.geography,
+            apportioned: s.apportioned,
+            apportionmentMethod: s.apportioned ? s.apportionmentMethod : undefined,
+            coverage: stcCoverage(parsed),
+          });
+          return;
+        }
 
         // Census Data API tables from get_census_table: verified against the
         // API's own table metadata instead of the Datatrove catalog.
