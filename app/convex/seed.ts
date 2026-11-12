@@ -8,7 +8,9 @@ import { LEGISLATOR_ROSTER } from "./legislatorRoster"
  * Resets the app to its original state: deletes every conversation, agent
  * thread (messages, streams), folder and user, then seeds the 76 legislators
  * (real names and official photos from legislatorRoster.ts) with their starter
- * folders and sample conversations. Internal, so only you can run it:
+ * folders and sample conversations. The public program inventory (`programs`
+ * table) is reference data and is left untouched; fill or update it with
+ * `npx convex run programs:refresh`. Internal, so only you can run it:
  *
  *   npx convex run seed:seed            (dev)
  *   npx convex run seed:seed --prod     (prod)

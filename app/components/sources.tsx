@@ -32,6 +32,8 @@ export interface SourceItem {
   /** True when figures were estimated/apportioned from other geographies. */
   apportioned?: boolean
   apportionmentMethod?: string
+  /** "program" for a program from the program inventory (links its official page). */
+  kind?: string
 }
 
 /** Shape of a cite_sources result as stored on a message part. */
@@ -50,6 +52,7 @@ interface CitedSourceOutput {
   geography?: string
   apportioned?: boolean
   apportionmentMethod?: string
+  kind?: string
 }
 
 interface ToolPartLike {
@@ -94,6 +97,7 @@ export function extractCitations(parts?: unknown[]): SourceItem[] {
       geography: item.geography,
       apportioned: item.apportioned,
       apportionmentMethod: item.apportionmentMethod,
+      kind: item.kind,
     }))
     .sort((a, b) => (a.number ?? 0) - (b.number ?? 0))
 }
@@ -103,7 +107,9 @@ export function describeCitation(source: SourceItem): string {
   return [
     source.year,
     source.geography,
-    source.apportioned
+    source.kind === "program"
+      ? "Official program page"
+      : source.apportioned
       ? `Estimated for the district${source.apportionmentMethod ? ` (${source.apportionmentMethod})` : ""}`
       : source.geography
         ? "Published for this geography"
@@ -406,7 +412,8 @@ export function Sources({
           <div className="flex flex-col gap-1.5 pt-1">
             {sources.map((source, idx) => {
               const vintage = [source.year, source.geography].filter(Boolean).join(" · ")
-              const isCitation = source.apportioned !== undefined
+              const isProgram = source.kind === "program"
+              const isCitation = source.apportioned !== undefined || isProgram
               const subtitle =
                 source.reason ||
                 [
@@ -457,7 +464,11 @@ export function Sources({
                       {isCitation && (
                         <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
                           <Badge variant={source.apportioned ? "secondary" : "outline"}>
-                            {source.apportioned ? "Estimated for district" : "Published for this geography"}
+                            {isProgram
+                              ? "Official program page"
+                              : source.apportioned
+                                ? "Estimated for district"
+                                : "Published for this geography"}
                           </Badge>
                           {vintage && <span className="text-muted-foreground">{vintage}</span>}
                         </div>

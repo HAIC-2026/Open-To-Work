@@ -31,6 +31,7 @@ import {
   Wrench,
   AlertCircle,
   Landmark,
+  HandHeart,
 } from "lucide-react"
 import { SourceFavicon } from "./sources"
 
@@ -85,6 +86,14 @@ function getToolMeta(toolName?: string) {
         runningText: "Fetching Census Bureau data...",
         doneText: "Fetched Census Bureau data",
         errorText: "Census data request failed",
+      }
+    case "search_programs":
+      return {
+        icon: HandHeart,
+        label: "Program Inventory",
+        runningText: "Searching public programs...",
+        doneText: "Searched public programs",
+        errorText: "Program search failed",
       }
     case "get_state_tax_collections":
       return {
@@ -290,6 +299,18 @@ export function AgentTrace({
                   : input.variables?.length
                   ? `Fetched ${what} from the Census Bureau`
                   : `Listed ${what}`
+              } else if (rawToolName === "search_programs") {
+                const count = typeof output?.count === "number" ? output.count : undefined
+                const what = input?.query ? `programs matching "${input.query}"` : "public programs"
+                title = isRunning
+                  ? `Searching ${what}...`
+                  : isInterrupted
+                  ? `Searching ${what} (halted)`
+                  : isError
+                  ? "Program search failed"
+                  : count !== undefined
+                  ? `Found ${count} ${count === 1 ? "program" : "programs"}${input?.query ? ` matching "${input.query}"` : ""}`
+                  : `Searched ${what}`
               } else if (
                 rawToolName === "get_state_tax_collections" &&
                 typeof input.startYear === "number"
