@@ -59,6 +59,19 @@ Additional rules for noncitizens
 There are other qualifications for noncitizens besides income, resources, and age or disability.`,
   },
 
+  "https://www.ssa.gov/agency/contact/phone.html": {
+    capturedAt: "2026-11-12",
+    text: `Contact Social Security By Phone
+
+If you cannot use our online services, we can help you by phone when you call your local Social Security office or our toll-free National 800 Number. You can find the phone number for your local office by using our Office Locator.
+
+You can call us at 1-800-772-1213 between 8:00 a.m. – 7:00 p.m. local time, Monday through Friday. Wait times to speak to a representative are typically shorter in the morning, later in the week, and later in the month. Our automated telephone services are available 24 hours a day and do not require you to wait to speak with a representative.
+
+If you're deaf or hard of hearing and use TTY equipment, you can call our TTY number at 1-800-325-0778.
+
+Informational messages on the automated line include Supplemental Security Income (SSI).`,
+  },
+
   "https://medquest.hawaii.gov/en/members-applicants/get-started/programs": {
     capturedAt: "2026-11-11",
     text: `Medicaid Programs

@@ -90,7 +90,11 @@ export const PROGRAM_SOURCES: ReadonlyArray<ProgramSource> = [
     officialUrl: "https://health.hawaii.gov/wic/",
     applyUrl: "https://health.hawaii.gov/wic/program_details/",
     keywords: "food nutrition pregnant breastfeeding infants babies toddlers children under five",
-    sources: ["https://health.hawaii.gov/wic/", "https://health.hawaii.gov/wic/program_details/"],
+    sources: [
+      "https://health.hawaii.gov/wic/",
+      "https://health.hawaii.gov/wic/program_details/",
+      "https://health.hawaii.gov/wic/clinic-locations/",
+    ],
   },
   {
     slug: "liheap",
@@ -137,7 +141,7 @@ export const PROGRAM_SOURCES: ReadonlyArray<ProgramSource> = [
     officialUrl: "https://www.ssa.gov/ssi",
     applyUrl: "https://www.ssa.gov/apply/ssi",
     keywords: "cash monthly payments disability blind kupuna seniors 65 low income",
-    sources: ["https://www.ssa.gov/ssi", "https://www.ssa.gov/ssi/eligibility"],
+    sources: ["https://www.ssa.gov/ssi", "https://www.ssa.gov/ssi/eligibility", "https://www.ssa.gov/agency/contact/phone.html"],
   },
   {
     slug: "federal-eitc",
@@ -151,6 +155,7 @@ export const PROGRAM_SOURCES: ReadonlyArray<ProgramSource> = [
       "https://www.irs.gov/credits-deductions/individuals/earned-income-tax-credit/who-qualifies-for-the-earned-income-tax-credit-eitc",
       "https://www.irs.gov/credits-deductions/individuals/earned-income-tax-credit/earned-income-and-earned-income-tax-credit-eitc-tables",
       "https://www.irs.gov/credits-deductions/individuals/earned-income-tax-credit/how-to-claim-the-earned-income-tax-credit-eitc",
+      "https://www.irs.gov/help/telephone-assistance",
     ],
   },
   {
@@ -163,6 +168,7 @@ export const PROGRAM_SOURCES: ReadonlyArray<ProgramSource> = [
     sources: [
       "https://files.hawaii.gov/tax/geninfo/info/Flyer-EITC.pdf",
       "https://files.hawaii.gov/tax/forms/current/n356_i.pdf",
+      "https://tax.hawaii.gov/contact/",
     ],
   },
   {
@@ -172,7 +178,7 @@ export const PROGRAM_SOURCES: ReadonlyArray<ProgramSource> = [
     officialUrl: "https://files.hawaii.gov/tax/forms/current/n311_i.pdf",
     applyUrl: "https://files.hawaii.gov/tax/forms/current/n311_i.pdf",
     keywords: "state tax credit refund food general excise tax GET low income",
-    sources: ["https://files.hawaii.gov/tax/forms/current/n311_i.pdf"],
+    sources: ["https://files.hawaii.gov/tax/forms/current/n311_i.pdf", "https://tax.hawaii.gov/contact/"],
   },
   {
     slug: "hawaii-low-income-renters-credit",
@@ -181,6 +187,6 @@ export const PROGRAM_SOURCES: ReadonlyArray<ProgramSource> = [
     officialUrl: "https://files.hawaii.gov/tax/forms/current/schx_i.pdf",
     applyUrl: "https://files.hawaii.gov/tax/forms/current/schx_i.pdf",
     keywords: "state tax credit refund rent renters housing low income kupuna",
-    sources: ["https://files.hawaii.gov/tax/forms/current/schx_i.pdf"],
+    sources: ["https://files.hawaii.gov/tax/forms/current/schx_i.pdf", "https://tax.hawaii.gov/contact/"],
   },
 ]
