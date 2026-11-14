@@ -5,13 +5,25 @@ import { createThread, saveMessages } from "@convex-dev/agent"
 import { LEGISLATOR_ROSTER } from "./legislatorRoster"
 
 /**
- * Resets the app to its original state: deletes every conversation, agent
- * thread (messages, streams), workspace and user, then seeds the 76 legislators
- * (real names and official photos from legislatorRoster.ts), each with three
- * starter projects (workspaces with just that legislator) and sample
- * conversations. The public program inventory (`programs`
- * table) is reference data and is left untouched; fill or update it with
- * `npx convex run programs:refresh`. Internal, so only you can run it:
+ * Resets the app to its original state:
+ *   1. shuts down every open Python (E2B) sandbox;
+ *   2. deletes every agent thread (messages, streams);
+ *   3. deletes every app table: users, conversations, projects (workspaces),
+ *      members, discussion messages and pins;
+ *   4. seeds the 76 legislators (real names and official photos from
+ *      legislatorRoster.ts), each with three starter projects (workspaces with
+ *      just that legislator) and sample conversations;
+ *   5. schedules programRefresh:refresh with force, which re-fetches every
+ *      program's official pages and re-summarizes all of them (about two
+ *      Gemini calls per program; it runs in the background after this
+ *      returns). The program documents are not deleted first: each keeps its
+ *      previous text and summary as a fallback if its site fails to load, and
+ *      stays searchable until its new summary replaces it. The refresh also
+ *      deletes programs no longer listed in programSources.ts.
+ *
+ * Seeded rows are written with the raw `_generated/server` builders, so the
+ * database triggers in ./functions do not run: reseeding does not generate a
+ * title for every sample conversation. Internal, so only you can run it:
  *
  *   npx convex run seed:seed            (dev)
  *   npx convex run seed:seed --prod     (prod)
@@ -239,21 +251,29 @@ export const seedLegislator = internalMutation({
 })
 
 type SeedResult = {
+  sandboxesKilled: number
   agentThreadsDeleted: number
   deleted: Record<string, number>
   seededUsers: number
+  programRefreshScheduled: boolean
 }
 
 export const seed = internalAction({
   args: {},
   returns: v.object({
+    sandboxesKilled: v.number(),
     agentThreadsDeleted: v.number(),
     deleted: v.record(v.string(), v.number()),
     seededUsers: v.number(),
+    programRefreshScheduled: v.boolean(),
   }),
   // Explicit return type: this handler references its own file via
   // `internal.seed`, which otherwise makes the generated API types circular.
   handler: async (ctx): Promise<SeedResult> => {
+    // 0. Python sandboxes (E2B component). The E2B client runs in a Node
+    //    action, so call it with runAction (the cross-runtime case).
+    const sandboxesKilled: number = await ctx.runAction(internal.chatActions.killAllSandboxes, {})
+
     // 1. Agent component data. Threads in this app are created without a
     //    userId, so list those directly; also clear any user-scoped threads.
     const threadIds: string[] = []
@@ -284,7 +304,7 @@ export const seed = internalAction({
       userCursor = page.isDone ? null : page.continueCursor
     } while (userCursor)
 
-    // 2. App tables, in batches.
+    // 2. App tables, in batches (the program inventory is refreshed below instead).
     const deleted: Record<string, number> = {}
     for (const table of APP_TABLES) {
       deleted[table] = 0
@@ -304,6 +324,16 @@ export const seed = internalAction({
       })
     }
 
-    return { agentThreadsDeleted: threadIds.length, deleted, seededUsers: LEGISLATOR_ROSTER.length }
+    // 4. Re-summarize every program from its official sources, in the
+    //    background (one action per program); force skips the "unchanged" check.
+    await ctx.scheduler.runAfter(0, internal.programRefresh.refresh, { force: true })
+
+    return {
+      sandboxesKilled,
+      agentThreadsDeleted: threadIds.length,
+      deleted,
+      seededUsers: LEGISLATOR_ROSTER.length,
+      programRefreshScheduled: true,
+    }
   },
 })

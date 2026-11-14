@@ -460,6 +460,24 @@ export const streamResponse = internalAction({
   },
 });
 
+/**
+ * Shut down every Python sandbox the app has open (scope "hawaii"), in pages.
+ * Used by seed:seed when resetting the app. Returns how many were shut down.
+ */
+export const killAllSandboxes = internalAction({
+  args: {},
+  returns: v.number(),
+  handler: async (ctx) => {
+    let total = 0;
+    for (let page = 0; page < 50; page++) {
+      const { killed, more } = await sandboxes.killScope(ctx, { scope: "hawaii", limit: 100 });
+      total += killed;
+      if (!more) break;
+    }
+    return total;
+  },
+});
+
 export const cleanupSandbox = internalAction({
   args: {
     userId: v.optional(v.string()),
