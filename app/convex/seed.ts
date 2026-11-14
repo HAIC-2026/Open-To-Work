@@ -11,8 +11,9 @@ import { LEGISLATOR_ROSTER } from "./legislatorRoster"
  *   3. deletes every app table: users, conversations, projects (workspaces),
  *      members, discussion messages and pins;
  *   4. seeds the 76 legislators (real names and official photos from
- *      legislatorRoster.ts), each with three starter projects (workspaces with
- *      just that legislator) and sample conversations;
+ *      legislatorRoster.ts); only House District 1 (the default legislator)
+ *      gets the three starter projects and sample conversations, everyone
+ *      else starts with none;
  *   5. schedules programRefresh:refresh with force, which re-fetches every
  *      program's official pages and re-summarizes all of them (about two
  *      Gemini calls per program; it runs in the background after this
@@ -189,12 +190,16 @@ export const deleteBatch = internalMutation({
   },
 })
 
-/** Creates one legislator with their starter projects and sample conversations. */
+/** Starter projects and sample conversations are seeded for this district only. */
+const DEMO_DISTRICT = "house-district-1"
+
+/** Creates one legislator, with starter projects and sample conversations if `withProjects`. */
 export const seedLegislator = internalMutation({
   args: {
     district: v.string(),
     name: v.string(),
     photoUrl: v.optional(v.string()),
+    withProjects: v.optional(v.boolean()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -203,6 +208,7 @@ export const seedLegislator = internalMutation({
       district: args.district,
       photoUrl: args.photoUrl,
     })
+    if (!args.withProjects) return null
 
     // e.g. "House District 1" or "Senate District 5"
     const num = args.district.replace(/\D/g, "")
@@ -315,12 +321,13 @@ export const seed = internalAction({
       }
     }
 
-    // 3. Seed the legislators and their starter projects, one per transaction.
+    // 3. Seed the legislators, one per transaction (starter projects for DEMO_DISTRICT only).
     for (const l of LEGISLATOR_ROSTER) {
       await ctx.runMutation(internal.seed.seedLegislator, {
         district: l.district,
         name: l.name,
         photoUrl: l.photoUrl,
+        withProjects: l.district === DEMO_DISTRICT,
       })
     }
 
