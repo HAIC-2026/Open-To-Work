@@ -391,13 +391,11 @@ export function Sources({
 
   if (sources.length === 0) return null
 
-  // Numbered citations carry year/geography/apportionment details that the
-  // inline [n] markers point to, so show the list open for those answers.
-  const hasCitations = sources.some((s) => s.number !== undefined)
-
   return (
     <Trace className={cn("w-full pt-1", className)} {...props}>
-      <TraceCollapsible defaultOpen={hasCitations}>
+      {/* Collapsed by default: the inline [n] markers already show each
+          source's details on hover, and one click here expands the list. */}
+      <TraceCollapsible>
         <TraceCollapsibleTrigger>
           <TraceLine>
             <TraceIcon>
