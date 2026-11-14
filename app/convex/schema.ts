@@ -60,27 +60,15 @@ export default defineSchema({
     body: v.string(),
   }).index("by_workspace", ["workspaceId"]),
 
-  /** Items pinned in a workspace: discussion messages, or answers from its conversations. */
+  /** Discussion messages pinned in a workspace (only discussion messages can be pinned). */
   workspacePins: defineTable({
     workspaceId: v.id("workspaces"),
     pinnedBy: v.id("users"),
-    /** The pinned text: a discussion message, or a conversation answer as markdown (maps included). */
+    messageId: v.id("workspaceMessages"),
+    /** Copy of the message text when it was pinned. */
     body: v.string(),
-    /** Where it came from: the conversation title, or the message author's name. */
+    /** The message author's name when it was pinned (shown if they leave the project). */
     sourceLabel: v.string(),
-    conversationId: v.optional(v.id("conversations")),
-    /** Set when a discussion message was pinned. */
-    messageId: v.optional(v.id("workspaceMessages")),
-    citations: v.optional(
-      v.array(
-        v.object({
-          number: v.number(),
-          url: v.string(),
-          title: v.optional(v.string()),
-          organization: v.optional(v.string()),
-        })
-      )
-    ),
   }).index("by_workspace", ["workspaceId"]),
 
   messages: defineTable({

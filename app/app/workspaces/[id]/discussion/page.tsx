@@ -35,8 +35,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { MarkdownRenderer } from "@/components/markdown-renderer"
-import { CitationList, Composer, MemberAvatar, formatTime, toSourceItems } from "@/components/workspaces/workspace-ui"
+import { Composer, MemberAvatar, formatTime } from "@/components/workspaces/workspace-ui"
 import { MentionText } from "@/components/workspaces/mentions"
 import { formatDistrictTitle, useActiveLegislator } from "@/lib/legislators"
 
@@ -145,7 +144,7 @@ export default function WorkspaceDiscussionPage() {
     if (flashTimer.current) window.clearTimeout(flashTimer.current)
   }, [])
   const pinsByMessage = React.useMemo(
-    () => new Map(pins?.filter((p) => p.messageId).map((p) => [p.messageId as string, p._id])),
+    () => new Map(pins?.map((p) => [p.messageId as string, p._id])),
     [pins]
   )
 
@@ -337,7 +336,7 @@ export default function WorkspaceDiscussionPage() {
           <Card className="bg-sidebar lg:min-h-0">
             <CardHeader>
               <CardTitle>Pinned</CardTitle>
-              <CardDescription>Messages and answers the group wants to keep at hand.</CardDescription>
+              <CardDescription>Discussion messages the group wants to keep at hand.</CardDescription>
             </CardHeader>
             <CardContent className="flex max-h-[28rem] min-h-0 flex-col lg:max-h-none lg:flex-1">
               {pins === undefined ? (
@@ -350,7 +349,7 @@ export default function WorkspaceDiscussionPage() {
                     </EmptyMedia>
                     <EmptyTitle>Nothing pinned yet</EmptyTitle>
                     <EmptyDescription>
-                      Pin a message in the discussion, or an answer from a conversation in this project.
+                      Use Pin under a message in the discussion to keep it here.
                     </EmptyDescription>
                   </EmptyHeader>
                 </Empty>
@@ -365,35 +364,25 @@ export default function WorkspaceDiscussionPage() {
                       size="sm"
                       className="relative bg-card has-[[data-jump]:hover]:bg-muted"
                     >
-                      {p.messageId && (
-                        <ItemMedia>
-                          {p.messageAuthor ? (
-                            <MemberAvatar member={p.messageAuthor} size="sm" />
-                          ) : (
-                            <Avatar size="sm">
-                              <AvatarFallback>?</AvatarFallback>
-                            </Avatar>
-                          )}
-                        </ItemMedia>
-                      )}
+                      <ItemMedia>
+                        {p.messageAuthor ? (
+                          <MemberAvatar member={p.messageAuthor} size="sm" />
+                        ) : (
+                          <Avatar size="sm">
+                            <AvatarFallback>?</AvatarFallback>
+                          </Avatar>
+                        )}
+                      </ItemMedia>
                       <ItemContent className="min-w-0">
                         <ItemTitle className="w-full">
-                          {p.conversationId ? (
-                            <Link href={`/conversations/${p.conversationId}`} className="truncate hover:underline">
-                              {p.sourceLabel}
-                            </Link>
-                          ) : (
-                            p.messageId && (
-                              <JumpToMessage
-                                messageId={p.messageId}
-                                label={p.messageAuthor?.name ?? p.sourceLabel}
-                                onJump={flash}
-                              />
-                            )
-                          )}
+                          <JumpToMessage
+                            messageId={p.messageId}
+                            label={p.messageAuthor?.name ?? p.sourceLabel}
+                            onJump={flash}
+                          />
                         </ItemTitle>
                         <ItemDescription>
-                          {p.messageId ? "Message" : "Conversation answer"} · pinned by{" "}
+                          Pinned by{" "}
                           {p.pinnedBy ? (p.pinnedBy._id === me._id ? "you" : p.pinnedBy.name) : "a former member"} ·{" "}
                           {formatTime(p._creationTime)}
                         </ItemDescription>
@@ -421,16 +410,9 @@ export default function WorkspaceDiscussionPage() {
                       )}
                       {/* The pinned text spans the item's full width below its title row. */}
                       <div className="flex max-h-96 basis-full flex-col gap-2 overflow-y-auto">
-                        {p.messageId ? (
-                          <p className="text-sm whitespace-pre-wrap">
-                            <MentionText body={p.body} />
-                          </p>
-                        ) : (
-                          <>
-                            <MarkdownRenderer content={p.body} citations={toSourceItems(p.citations)} className="text-sm md:text-sm" />
-                            <CitationList citations={p.citations} />
-                          </>
-                        )}
+                        <p className="text-sm whitespace-pre-wrap">
+                          <MentionText body={p.body} />
+                        </p>
                       </div>
                     </Item>
                   ))}

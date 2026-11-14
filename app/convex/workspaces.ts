@@ -15,14 +15,6 @@ const MAX_MESSAGE_LENGTH = 4000
 const MAX_WORKSPACES_PER_USER = 100
 const MAX_CONVERSATIONS = 200
 const MAX_PINS = 100
-const MAX_PIN_LENGTH = 40000
-/** A numbered source behind `[n]` markers in a pinned answer. */
-export const citationValidator = v.object({
-  number: v.number(),
-  url: v.string(),
-  title: v.optional(v.string()),
-  organization: v.optional(v.string()),
-})
 
 const memberValidator = v.object({
   _id: v.id("users"),
@@ -398,20 +390,21 @@ export const deleteMessage = mutation({
   },
 })
 
-/** Items pinned in the workspace, newest first. */
+/**
+ * Discussion messages pinned in the workspace, newest first. People (pinners
+ * and authors) are read once each rather than once per pin.
+ */
 export const listPins = query({
   args: { workspaceId: v.id("workspaces") },
   returns: v.array(
     v.object({
       _id: v.id("workspacePins"),
       _creationTime: v.number(),
+      messageId: v.id("workspaceMessages"),
       body: v.string(),
+      /** Author name saved when pinned (used if the author is no longer found). */
       sourceLabel: v.string(),
-      conversationId: v.optional(v.id("conversations")),
-      messageId: v.optional(v.id("workspaceMessages")),
-      /** Who wrote the pinned discussion message. */
       messageAuthor: v.union(memberValidator, v.null()),
-      citations: v.array(citationValidator),
       pinnedBy: v.union(memberValidator, v.null()),
     })
   ),
@@ -421,57 +414,28 @@ export const listPins = query({
       .withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
       .order("desc")
       .take(MAX_PINS)
-    const result = []
-    for (const p of pins) {
-      const user = await ctx.db.get(p.pinnedBy)
-      const message = p.messageId ? await ctx.db.get(p.messageId) : null
-      const author = message ? await ctx.db.get(message.authorId) : null
-      result.push({
+    const messages = await Promise.all(pins.map((p) => ctx.db.get(p.messageId)))
+    const userIds = new Set<Id<"users">>()
+    pins.forEach((p, i) => {
+      userIds.add(p.pinnedBy)
+      const authorId = messages[i]?.authorId
+      if (authorId) userIds.add(authorId)
+    })
+    const users = new Map<Id<"users">, ReturnType<typeof toMember>>()
+    for (const u of await Promise.all([...userIds].map((id) => ctx.db.get(id)))) {
+      if (u) users.set(u._id, toMember(u))
+    }
+    return pins.map((p, i) => {
+      const authorId = messages[i]?.authorId
+      return {
         _id: p._id,
         _creationTime: p._creationTime,
+        messageId: p.messageId,
         body: p.body,
         sourceLabel: p.sourceLabel,
-        conversationId: p.conversationId,
-        messageId: p.messageId,
-        messageAuthor: author ? toMember(author) : null,
-        citations: p.citations ?? [],
-        pinnedBy: user ? toMember(user) : null,
-      })
-    }
-    return result
-  },
-})
-
-/** Pin an answer from one of the project's conversations in its workspace. Members only. */
-export const pin = mutation({
-  args: {
-    workspaceId: v.id("workspaces"),
-    pinnedBy: v.id("users"),
-    body: v.string(),
-    sourceLabel: v.string(),
-    conversationId: v.optional(v.id("conversations")),
-    citations: v.optional(v.array(citationValidator)),
-  },
-  returns: v.id("workspacePins"),
-  handler: async (ctx, args) => {
-    const body = args.body.trim()
-    if (!body) throw new Error("Nothing to pin")
-    if (body.length > MAX_PIN_LENGTH) throw new Error("This answer is too long to pin")
-    if (!(await membershipOf(ctx, args.workspaceId, args.pinnedBy))) throw new Error("Only members can pin answers")
-    const existing = await ctx.db
-      .query("workspacePins")
-      .withIndex("by_workspace", (q) => q.eq("workspaceId", args.workspaceId))
-      .take(MAX_PINS)
-    if (existing.length >= MAX_PINS) throw new Error(`A workspace holds at most ${MAX_PINS} pinned items`)
-    const duplicate = existing.find((p) => p.body === body)
-    if (duplicate) return duplicate._id
-    return await ctx.db.insert("workspacePins", {
-      workspaceId: args.workspaceId,
-      pinnedBy: args.pinnedBy,
-      body,
-      sourceLabel: args.sourceLabel.trim() || "Conversation",
-      conversationId: args.conversationId,
-      citations: args.citations ?? [],
+        messageAuthor: (authorId && users.get(authorId)) || null,
+        pinnedBy: users.get(p.pinnedBy) ?? null,
+      }
     })
   },
 })
@@ -498,7 +462,6 @@ export const pinMessage = mutation({
       body: message.body,
       sourceLabel: author?.name ?? "Former member",
       messageId: args.messageId,
-      citations: [],
     })
   },
 })

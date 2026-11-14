@@ -50,10 +50,8 @@ import {
   CopyIcon,
   CheckIcon,
   PencilIcon,
-  Pin,
   RotateCcw,
 } from "lucide-react"
-import { useActiveLegislator } from "@/lib/legislators"
 
 function MessageAction({
   label,
@@ -205,15 +203,6 @@ export default function ConversationPage({
     }
   )
   const resubmitMessageMutation = useMutation(api.chat.resubmitMessage)
-  // Answers in a project's conversations can be pinned in its workspace.
-  const users = useQuery(api.users.list)
-  const [me] = useActiveLegislator(users)
-  const projectId = conversation?.workspaceId
-  const project = useQuery(api.workspaces.get, projectId ? { id: projectId } : "skip")
-  const projectPins = useQuery(api.workspaces.listPins, projectId ? { workspaceId: projectId } : "skip")
-  const pinMutation = useMutation(api.workspaces.pin)
-  const canPin = Boolean(project && me._id && project.members.some((m) => m._id === me._id))
-  const pinnedBodies = React.useMemo(() => new Set(projectPins?.map((p) => p.body)), [projectPins])
   const stopThinkingMutation = useMutation(api.chat.stopThinking)
   const [isHalting, setIsHalting] = React.useState(false)
 
@@ -591,36 +580,6 @@ export default function ConversationPage({
                                     >
                                       <RotateCcw className="size-4" />
                                     </MessageAction>
-                                  )}
-                                  {canPin && project && me._id && !isMessageThinking && Boolean(message.content) && (
-                                    pinnedBodies.has(message.content.trim()) ? (
-                                      <span className="flex items-center gap-1.5 px-2 text-xs text-muted-foreground">
-                                        <Pin className="size-3.5" /> Pinned in {project.name}
-                                      </span>
-                                    ) : (
-                                      <MessageAction
-                                        label={`Pin in ${project.name} workspace`}
-                                        onClick={() =>
-                                          void pinMutation({
-                                            workspaceId: project._id,
-                                            pinnedBy: me._id!,
-                                            body: message.content,
-                                            sourceLabel: conversation.title,
-                                            conversationId: conversation._id,
-                                            citations: extractCitations("parts" in message ? message.parts : undefined)
-                                              .filter((c) => typeof c.number === "number")
-                                              .map((c) => ({
-                                                number: c.number as number,
-                                                url: c.url,
-                                                title: c.title,
-                                                organization: c.organization,
-                                              })),
-                                          })
-                                        }
-                                      >
-                                        <Pin className="size-4" />
-                                      </MessageAction>
-                                    )
                                   )}
                                 </MessageFooter>
                               )}

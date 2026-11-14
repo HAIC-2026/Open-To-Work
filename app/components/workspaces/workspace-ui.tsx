@@ -7,7 +7,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@/components/ui/input-group"
 import { Command, CommandGroup, CommandItem, CommandList } from "@/components/ui/command"
 import { Spinner } from "@/components/ui/spinner"
-import type { SourceItem } from "@/components/sources"
 import {
   activeMentionQuery,
   encodeMentions,
@@ -24,13 +23,6 @@ export interface Member {
   name: string
   district: string
   photoUrl?: string
-}
-
-export interface Citation {
-  number: number
-  url: string
-  title?: string
-  organization?: string
 }
 
 export function initials(name: string) {
@@ -58,29 +50,6 @@ export function formatTime(ms: number) {
     hour: "numeric",
     minute: "2-digit",
   }).format(ms)
-}
-
-/** Stored citations in the shape the markdown renderer's `[n]` markers use. */
-export function toSourceItems(citations: Citation[]): SourceItem[] {
-  return citations.map((c) => ({ url: c.url, title: c.title, organization: c.organization, number: c.number }))
-}
-
-/** Numbered source list under a pinned answer. */
-export function CitationList({ citations }: { citations: Citation[] }) {
-  if (citations.length === 0) return null
-  return (
-    <ol className="flex flex-col gap-1 text-xs text-muted-foreground">
-      {citations.map((c) => (
-        <li key={c.number} className="flex gap-1.5">
-          <span className="tabular-nums">[{c.number}]</span>
-          <a href={c.url} target="_blank" rel="noreferrer" className="truncate underline-offset-2 hover:underline">
-            {c.title || c.url}
-            {c.organization ? ` · ${c.organization}` : ""}
-          </a>
-        </li>
-      ))}
-    </ol>
-  )
 }
 
 /**
