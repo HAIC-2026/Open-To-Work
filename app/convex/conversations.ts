@@ -15,6 +15,7 @@ const conversationValidator = v.object({
   isPinned: v.optional(v.boolean()),
   userId: v.optional(v.id("users")),
   thinking: v.optional(v.boolean()),
+  mode: v.optional(v.union(v.literal("district"), v.literal("collaborate"))),
 })
 
 /**
@@ -68,6 +69,7 @@ export const get = query({
       isPinned: v.optional(v.boolean()),
       userId: v.optional(v.id("users")),
       thinking: v.optional(v.boolean()),
+      mode: v.optional(v.union(v.literal("district"), v.literal("collaborate"))),
     })
   ),
   handler: async (ctx, args) => {
@@ -136,6 +138,8 @@ export const create = mutation({
     userId: v.optional(v.id("users")),
     district: v.optional(v.string()),
     folderId: v.optional(v.id("folders")),
+    // "collaborate" for conversations started from the Collaborate tab.
+    mode: v.optional(v.union(v.literal("district"), v.literal("collaborate"))),
   },
   returns: v.id("conversations"),
   handler: async (ctx, args) => {
@@ -178,6 +182,7 @@ export const create = mutation({
       isPinned: false,
       userId: targetUserId,
       thinking: true,
+      mode: args.mode,
     })
 
     // Save first user prompt message into the agent thread
@@ -193,6 +198,7 @@ export const create = mutation({
       promptMessageId: messageId,
       district: args.district,
       userId: targetUserId,
+      mode: args.mode,
     })
 
     return conversationId

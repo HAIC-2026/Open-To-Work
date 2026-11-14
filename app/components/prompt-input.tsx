@@ -61,6 +61,11 @@ const SENATE_DISTRICTS = Array.from(
   (_, i) => `Senate District ${i + 1}`
 )
 
+export interface PromptInputHandle {
+  /** Put text in the box and focus it, without sending. */
+  setDraft: (text: string) => void
+}
+
 export interface PromptInputProps {
   onSubmit?: (prompt: string, district?: string, folderId?: Id<"folders">) => void
   onStop?: () => void
@@ -74,6 +79,8 @@ export interface PromptInputProps {
   /** Controlled district. When omitted, the input manages it internally. */
   selectedDistrict?: string
   onDistrictChange?: (district: string) => void
+  /** Imperative controls (a plain prop, like the district map view's handleRef). */
+  handleRef?: React.Ref<PromptInputHandle>
 }
 
 export function PromptInput({
@@ -88,6 +95,7 @@ export function PromptInput({
   onFolderChange,
   selectedDistrict: selectedDistrictProp,
   onDistrictChange,
+  handleRef,
 }: PromptInputProps) {
   const [text, setText] = React.useState("")
   const [activeLegislator] = useActiveLegislator()
@@ -128,6 +136,16 @@ export function PromptInput({
   const selectedFolder = projectFolders?.find((f) => f._id === currentFolderId)
 
   const formRef = React.useRef<HTMLFormElement>(null)
+  React.useImperativeHandle(
+    handleRef,
+    () => ({
+      setDraft: (draft) => {
+        setText(draft)
+        formRef.current?.querySelector("textarea")?.focus()
+      },
+    }),
+    []
+  )
   const inputRef = React.useRef<HTMLInputElement>(null)
 
   const isBlocked = disabled || isLoading

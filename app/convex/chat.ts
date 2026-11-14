@@ -92,6 +92,7 @@ export const sendMessage = mutation({
       promptMessageId: messageId,
       district: conversation.district,
       userId: conversation.userId,
+      mode: conversation.mode,
     });
 
     return null;
@@ -180,6 +181,7 @@ export const resubmitMessage = mutation({
         promptMessageId: messageId,
         district: conversation.district,
         userId: conversation.userId,
+        mode: conversation.mode,
       });
 
       return null;
@@ -257,6 +259,7 @@ export const resubmitMessage = mutation({
       promptMessageId: args.messageId,
       district: conversation.district,
       userId: conversation.userId,
+      mode: conversation.mode,
     });
 
     return null;

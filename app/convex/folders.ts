@@ -25,6 +25,7 @@ export const listWithConversations = query({
           isPinned: v.optional(v.boolean()),
           userId: v.optional(v.id("users")),
           thinking: v.optional(v.boolean()),
+          mode: v.optional(v.union(v.literal("district"), v.literal("collaborate"))),
         })
       ),
     })

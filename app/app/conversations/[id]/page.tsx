@@ -6,7 +6,8 @@ import { useQuery, useMutation } from "convex/react"
 import { useUIMessages, optimisticallySendMessage } from "@convex-dev/agent/react"
 import { api } from "@/convex/_generated/api"
 import type { Id } from "@/convex/_generated/dataModel"
-import { PromptInput } from "@/components/prompt-input"
+import { PromptInput, type PromptInputHandle } from "@/components/prompt-input"
+import { MapAskContext } from "@/components/district-map/district-map-block"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -164,6 +165,11 @@ export default function ConversationPage({
   const { id } = React.use(params)
 
   const conversation = useQuery(api.conversations.get, { id })
+  const promptRef = React.useRef<PromptInputHandle>(null)
+  // Clicking a district on a map puts a follow-up question in the chat box.
+  const askAboutDistrict = React.useCallback((question: string) => {
+    promptRef.current?.setDraft(question)
+  }, [])
   const threadId = conversation?.threadId
   const threadMessages = useUIMessages(
     api.chat.listThreadMessages,
@@ -364,6 +370,7 @@ export default function ConversationPage({
                 </EmptyHeader>
               </Empty>
             ) : (
+              <MapAskContext.Provider value={askAboutDistrict}>
               <MessageScroller>
                 <MessageScrollerViewport className="[mask-image:none]">
                   <MessageScrollerContent
@@ -485,6 +492,7 @@ export default function ConversationPage({
                                 <MarkdownRenderer
                                   content={message.content}
                                   citations={extractCitations((message as any).parts)}
+                                  isStreaming={isStreaming}
                                 >
                                   {isStreaming && (
                                     <span
@@ -533,6 +541,7 @@ export default function ConversationPage({
                 </MessageScrollerViewport>
                 <MessageScrollerButton className="data-[direction=end]:bottom-[168px] z-30 shadow-md border bg-background/95 backdrop-blur hover:bg-muted" />
               </MessageScroller>
+              </MapAskContext.Provider>
             )}
           </div>
 
@@ -540,7 +549,14 @@ export default function ConversationPage({
           <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col bg-transparent pb-6 md:pb-8">
             <div className="pointer-events-auto mx-auto w-full max-w-3xl px-6 md:px-8">
               <PromptInput
-                placeholder={isThinking ? "Assistant is thinking..." : "Ask about this district..."}
+                handleRef={promptRef}
+                placeholder={
+                  isThinking
+                    ? "Assistant is thinking..."
+                    : conversation.mode === "collaborate"
+                      ? "Ask about programs for your district, or who to partner with..."
+                      : "Ask about this district..."
+                }
                 onSubmit={handleSendMessage}
                 onStop={handleStopThinking}
                 isLoading={isSubmitting || isThinking || isHalting}

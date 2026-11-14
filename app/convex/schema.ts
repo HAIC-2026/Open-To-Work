@@ -23,6 +23,12 @@ export default defineSchema({
     isPinned: v.optional(v.boolean()),
     userId: v.optional(v.id("users")),
     thinking: v.optional(v.boolean()),
+    /**
+     * What the conversation is for. "collaborate" conversations start from the
+     * Collaborate tab: the official's own district first, then other districts in the same situation;
+     * absent or "district" is a normal district conversation.
+     */
+    mode: v.optional(v.union(v.literal("district"), v.literal("collaborate"))),
   })
     .index("by_user_folder", ["userId", "folderId"])
     .index("by_folder", ["folderId"]),

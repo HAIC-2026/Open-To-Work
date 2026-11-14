@@ -19,6 +19,7 @@ import {
 import { cn } from "@/lib/utils"
 import { CitationMarkers, rehypeCitations } from "@/components/citation-marker"
 import type { SourceItem } from "@/components/sources"
+import { DistrictMapBlock } from "@/components/district-map/district-map-block"
 
 interface MarkdownRendererProps {
   content: string
@@ -26,9 +27,17 @@ interface MarkdownRendererProps {
   children?: React.ReactNode
   /** Numbered sources from cite_sources; `[n]` markers become citation links. */
   citations?: SourceItem[]
+  /** True while the answer is still streaming (unfinished map blocks show a placeholder). */
+  isStreaming?: boolean
 }
 
-export function MarkdownRenderer({ content, className, children, citations = [] }: MarkdownRendererProps) {
+export function MarkdownRenderer({
+  content,
+  className,
+  children,
+  citations = [],
+  isStreaming = false,
+}: MarkdownRendererProps) {
   return (
     <div className={cn("text-sm md:text-base leading-relaxed text-foreground", className)}>
       <ReactMarkdown
@@ -124,6 +133,11 @@ export function MarkdownRenderer({ content, className, children, citations = [] 
           ),
           pre: ({ children: preChildren }) => <>{preChildren}</>,
           code: ({ className: codeClassName, children: codeChildren, ...props }) => {
+            // ```district-map blocks are map descriptions written by the agent
+            // (DISTRICT MAPS rules in convex/chatActions.ts), drawn as a map.
+            if (/(^|\s)language-district-map(\s|$)/.test(codeClassName || "")) {
+              return <DistrictMapBlock source={String(codeChildren)} isStreaming={isStreaming} />
+            }
             const match = /language-(\w+)/.exec(codeClassName || "")
             const isInline = !match && !String(codeChildren).includes("\n")
 
