@@ -218,7 +218,8 @@ function DraggableFolderConversationItem({
       <SidebarMenuSubButton
         render={<Link href={`/conversations/${conv._id}`} />}
         isActive={isActive}
-        className="h-8 pr-16"
+        // SidebarMenuSubButton has no bold-when-active rule; match Recents rows.
+        className="h-8 pr-16 data-active:font-medium"
       >
         {/* `!` because SidebarMenuSubButton forces its icons to the accent colour;
             these match the icons in Recents instead. */}
