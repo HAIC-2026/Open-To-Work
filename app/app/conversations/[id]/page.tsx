@@ -51,6 +51,7 @@ import {
   CheckIcon,
   PencilIcon,
   Pin,
+  RotateCcw,
 } from "lucide-react"
 import { useActiveLegislator } from "@/lib/legislators"
 
@@ -287,6 +288,29 @@ export default function ConversationPage({
       setIsResubmitting(false)
     }
   }
+
+  // Regenerate the newest answer: resubmit the latest question unchanged. The
+  // resubmit mutation deletes the old answer (and its tool steps), resets the
+  // Python sandbox and schedules a fresh response; the title is kept.
+  const lastQuestion = [...messages].reverse().find((m) => m.role === "user")
+  const handleRegenerate = async () => {
+    if (!lastQuestion || isResubmitting || isThinking || !conversation) return
+    try {
+      setIsResubmitting(true)
+      await resubmitMessageMutation({
+        conversationId: conversation._id,
+        messageId: lastQuestion._id,
+        content: lastQuestion.content,
+      })
+    } catch (err) {
+      console.error("Failed to regenerate response:", err)
+    } finally {
+      setIsResubmitting(false)
+    }
+  }
+
+  // Follow-up questions for the newest answer (generated in the background once it finishes).
+  const showSuggestions = !isThinking && !isSubmitting && (conversation?.suggestions?.length ?? 0) > 0
 
   const handleSendMessage = async (content: string) => {
     if (!content.trim() || isSubmitting || isThinking || !conversation) return
@@ -539,19 +563,31 @@ export default function ConversationPage({
                                   content={message.content}
                                 />
                               )}
-                              {!isPending && Boolean(message.content) && (
+                              {!isPending && (Boolean(message.content) || (isLastAssistantMessage && !isThinking)) && (
                                 <MessageFooter className="px-0">
-                                  <MessageAction
-                                    label={copiedId === message._id ? "Copied" : "Copy"}
-                                    onClick={() => handleCopy(message._id, message.content)}
-                                  >
-                                    {copiedId === message._id ? (
-                                      <CheckIcon className="size-4" />
-                                    ) : (
-                                      <CopyIcon className="size-4" />
-                                    )}
-                                  </MessageAction>
-                                  {canPin && project && me._id && !isMessageThinking && (
+                                  {Boolean(message.content) && (
+                                    <MessageAction
+                                      label={copiedId === message._id ? "Copied" : "Copy"}
+                                      onClick={() => handleCopy(message._id, message.content)}
+                                    >
+                                      {copiedId === message._id ? (
+                                        <CheckIcon className="size-4" />
+                                      ) : (
+                                        <CopyIcon className="size-4" />
+                                      )}
+                                    </MessageAction>
+                                  )}
+                                  {/* Only the newest answer can be regenerated (it is replaced, not added to). */}
+                                  {isLastAssistantMessage && !isThinking && lastQuestion && (
+                                    <MessageAction
+                                      label="Regenerate"
+                                      onClick={() => void handleRegenerate()}
+                                      disabled={isResubmitting}
+                                    >
+                                      <RotateCcw className="size-4" />
+                                    </MessageAction>
+                                  )}
+                                  {canPin && project && me._id && !isMessageThinking && Boolean(message.content) && (
                                     pinnedBodies.has(message.content.trim()) ? (
                                       <span className="flex items-center gap-1.5 px-2 text-xs text-muted-foreground">
                                         <Pin className="size-3.5" /> Pinned in {project.name}
@@ -582,6 +618,23 @@ export default function ConversationPage({
                                     )
                                   )}
                                 </MessageFooter>
+                              )}
+                              {/* Follow-up suggestions (shadcn AI Elements "Suggestion"), only under the
+                                  newest answer; they're cleared as soon as another question is sent. */}
+                              {isLastAssistantMessage && showSuggestions && (
+                                <div className="flex flex-wrap gap-2">
+                                  {conversation.suggestions!.map((suggestion) => (
+                                    <Button
+                                      key={suggestion}
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-auto min-h-7 max-w-full py-1 text-left whitespace-normal"
+                                      onClick={() => void handleSendMessage(suggestion)}
+                                    >
+                                      {suggestion}
+                                    </Button>
+                                  ))}
+                                </div>
                               )}
                             </MessageContent>
                           </Message>

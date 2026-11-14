@@ -1,4 +1,7 @@
-import { mutation, query, internalMutation } from "./_generated/server"
+import { query } from "./_generated/server"
+// Wrapped builders so writes fire the database triggers in ./functions
+// (a new conversation schedules its LLM title).
+import { mutation, internalMutation } from "./functions"
 import { v } from "convex/values"
 import { paginationOptsValidator, paginationResultValidator } from "convex/server"
 import type { Id } from "./_generated/dataModel"
@@ -16,6 +19,7 @@ const conversationValidator = v.object({
   thinking: v.optional(v.boolean()),
   mode: v.optional(v.union(v.literal("district"), v.literal("collaborate"))),
   workspaceId: v.optional(v.id("workspaces")),
+  suggestions: v.optional(v.array(v.string())),
 })
 
 /**
@@ -70,6 +74,7 @@ export const get = query({
       thinking: v.optional(v.boolean()),
       mode: v.optional(v.union(v.literal("district"), v.literal("collaborate"))),
       workspaceId: v.optional(v.id("workspaces")),
+      suggestions: v.optional(v.array(v.string())),
     })
   ),
   handler: async (ctx, args) => {
@@ -131,10 +136,10 @@ export const getMessages = query({
 
 export const create = mutation({
   args: {
+    // The first question: sent as the first message and used as the title
+    // until the background job (scheduled by the conversations trigger)
+    // replaces it with a short LLM-written one.
     title: v.string(),
-    // First user message. Defaults to `title` when omitted, so callers can
-    // pass a short sidebar title with a longer preset prompt.
-    prompt: v.optional(v.string()),
     userId: v.optional(v.id("users")),
     district: v.optional(v.string()),
     // "collaborate" for conversations started from the Collaborate tab.
@@ -148,7 +153,6 @@ export const create = mutation({
     if (!trimmedTitle) {
       throw new Error("Conversation title cannot be empty")
     }
-    const trimmedPrompt = args.prompt?.trim() || trimmedTitle
 
     let targetUserId = args.userId
     if (!targetUserId) {
@@ -191,7 +195,7 @@ export const create = mutation({
     // Save first user prompt message into the agent thread
     const { messageId } = await saveMessage(ctx, components.agent, {
       threadId,
-      prompt: trimmedPrompt,
+      prompt: trimmedTitle,
     })
 
     // Trigger the background LLM response stream
@@ -205,6 +209,40 @@ export const create = mutation({
     })
 
     return conversationId
+  },
+})
+
+/**
+ * Save follow-up suggestions for the latest answer, unless a new question has
+ * started since (the trigger clears suggestions when one does).
+ */
+export const applySuggestions = internalMutation({
+  args: { conversationId: v.id("conversations"), suggestions: v.array(v.string()) },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const conv = await ctx.db.get(args.conversationId)
+    if (!conv || conv.thinking) return null
+    await ctx.db.patch(args.conversationId, { suggestions: args.suggestions })
+    return null
+  },
+})
+
+/**
+ * Save a generated title, but only if the conversation still has the title it
+ * was created with: a rename made while the title was generating wins.
+ */
+export const applyGeneratedTitle = internalMutation({
+  args: {
+    conversationId: v.id("conversations"),
+    expectedTitle: v.string(),
+    title: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const conv = await ctx.db.get(args.conversationId)
+    if (!conv || conv.title !== args.expectedTitle) return null
+    await ctx.db.patch(args.conversationId, { title: args.title })
+    return null
   },
 })
 

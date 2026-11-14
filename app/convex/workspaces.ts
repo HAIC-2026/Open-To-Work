@@ -42,6 +42,7 @@ const conversationValidator = v.object({
   thinking: v.optional(v.boolean()),
   mode: v.optional(v.union(v.literal("district"), v.literal("collaborate"))),
   workspaceId: v.optional(v.id("workspaces")),
+  suggestions: v.optional(v.array(v.string())),
 })
 
 function toMember(u: Doc<"users">) {

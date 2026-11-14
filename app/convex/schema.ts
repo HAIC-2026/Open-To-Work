@@ -23,6 +23,8 @@ export default defineSchema({
     mode: v.optional(v.union(v.literal("district"), v.literal("collaborate"))),
     /** The workspace (project) it belongs to; absent = in the owner's Recents. */
     workspaceId: v.optional(v.id("workspaces")),
+    /** Follow-up questions suggested after the latest answer (cleared when a new question is sent). */
+    suggestions: v.optional(v.array(v.string())),
   })
     .index("by_user_workspace", ["userId", "workspaceId"])
     .index("by_workspace", ["workspaceId"]),

@@ -68,7 +68,6 @@ export function ChatStart({ heading, icon: HeadingIcon, presets, mode, placehold
 
   const startConversation = async (args: {
     title: string
-    prompt?: string
     district?: string
     folderId?: Id<"workspaces">
   }) => {
@@ -77,7 +76,6 @@ export function ChatStart({ heading, icon: HeadingIcon, presets, mode, placehold
       setIsSubmitting(true)
       const conversationId = await createConversation({
         title: args.title.trim(),
-        prompt: args.prompt,
         district: args.district,
         workspaceId: args.folderId,
         userId: activeLegislator._id,
@@ -101,8 +99,9 @@ export function ChatStart({ heading, icon: HeadingIcon, presets, mode, placehold
     if (isSubmitting) return
     setPendingPresetId(preset.id)
     const ok = await startConversation({
-      title: `${preset.label} · ${selectedDistrict}`,
-      prompt: preset.prompt,
+      // The preset's question is the first message and the starting title;
+      // a background job replaces the title with a short LLM-written one.
+      title: preset.prompt,
       district: selectedDistrict,
       folderId: selectedFolderId,
     })

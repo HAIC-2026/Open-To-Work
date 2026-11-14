@@ -1,4 +1,7 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation as rawMutation } from "./_generated/server";
+// Sending and resubmitting use the wrapped builder so the conversations
+// triggers run (a new question clears the old follow-up suggestions).
+import { mutation } from "./functions";
 import { internal, components } from "./_generated/api";
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
@@ -165,14 +168,21 @@ export const resubmitMessage = mutation({
         prompt: trimmedContent,
       });
 
-      if (targetIdx === 0) {
-        await ctx.db.patch(args.conversationId, {
-          title: trimmedContent,
-          threadId,
-          thinking: true,
+      // Regenerating (same text) keeps the title; an edited first question
+      // gets a new LLM title, like a new conversation would.
+      const firstQuestionEdited =
+        targetIdx === 0 && legacyMsgs[0]?.content.trim() !== trimmedContent;
+      await ctx.db.patch(args.conversationId, {
+        threadId,
+        thinking: true,
+        ...(firstQuestionEdited ? { title: trimmedContent } : {}),
+      });
+      if (firstQuestionEdited) {
+        await ctx.scheduler.runAfter(0, internal.titles.generate, {
+          conversationId: args.conversationId,
+          question: trimmedContent,
+          district: conversation.district,
         });
-      } else {
-        await ctx.db.patch(args.conversationId, { threadId, thinking: true });
       }
 
       await ctx.scheduler.runAfter(0, internal.chatActions.streamResponse, {
@@ -234,15 +244,19 @@ export const resubmitMessage = mutation({
       },
     });
 
-    // 4. Mark conversation as thinking and update title if Turn 0
-    if (targetMsg.order === 0) {
-      await ctx.db.patch(args.conversationId, {
-        title: trimmedContent,
-        thinking: true,
-      });
-    } else {
-      await ctx.db.patch(args.conversationId, {
-        thinking: true,
+    // 4. Mark conversation as thinking. Regenerating (same text) keeps the
+    // title; an edited first question gets a new LLM title.
+    const firstQuestionEdited =
+      targetMsg.order === 0 && (targetMsg.text ?? "").trim() !== trimmedContent;
+    await ctx.db.patch(args.conversationId, {
+      thinking: true,
+      ...(firstQuestionEdited ? { title: trimmedContent } : {}),
+    });
+    if (firstQuestionEdited) {
+      await ctx.scheduler.runAfter(0, internal.titles.generate, {
+        conversationId: args.conversationId,
+        question: trimmedContent,
+        district: conversation.district,
       });
     }
 
@@ -266,7 +280,8 @@ export const resubmitMessage = mutation({
   },
 });
 
-export const stopThinking = mutation({
+// Raw builder on purpose: stopping an answer shouldn't trigger follow-up suggestions.
+export const stopThinking = rawMutation({
   args: {
     conversationId: v.id("conversations"),
   },
