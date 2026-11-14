@@ -133,6 +133,7 @@ const BASE_INSTRUCTIONS =
   "• Statistics & Math: `scipy`, `scikit-learn`, `sympy`, `mpmath`\n" +
   "• Visualization: `matplotlib`, `seaborn`, `plotly`, `bokeh`\n" +
   "• Documents & Validation: `python-docx`, `pydantic`, `nltk`, `spacy`\n" +
+  "• PDF: `pypdf` (text: `pypdf.PdfReader(io.BytesIO(res.content))`, then `page.extract_text()`), `pdfplumber` (tables: `pdfplumber.open(io.BytesIO(res.content))`, then `page.extract_tables()`). Read only the pages you need; large PDFs can exceed the time limit. NOT installed: `PyPDF2`, `fitz`/`PyMuPDF`, `camelot`, `tabula`.\n" +
   "• Geospatial: `geopandas`, `shapely`, `pyproj`, `pyogrio` (GDAL bundled). NOT installed: `fiona`, `rasterio`, `folium`, `contextily`.\n\n" +
   "GEOSPATIAL ANALYSIS (address → district, district overlaps, tracts within a district, area shares):\n" +
   "1. Use `geopandas` for all polygon work. Never hand-roll point-in-polygon, ray casting, or Monte Carlo sampling.\n" +
