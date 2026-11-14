@@ -27,12 +27,15 @@ import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 
 /**
- * Who is creating the workspace and from which conversation. Provided by the
- * conversation page; without it, maps show no "Start a workspace" button.
+ * Who is creating the project and from which conversation. Provided by the
+ * conversation page; without it, project invite cards in answers don't show.
  */
 export interface WorkspaceStartInfo {
   createdBy: Id<"users">
+  /** Set when the conversation is not in a project yet: it moves into the new one. */
   conversationId?: Id<"conversations">
+  /** The project the conversation is already in, if any (invites then add to it). */
+  workspaceId?: Id<"workspaces">
 }
 
 export const WorkspaceStartContext = React.createContext<WorkspaceStartInfo | null>(null)

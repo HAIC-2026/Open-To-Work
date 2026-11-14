@@ -121,6 +121,10 @@ const COLLABORATE_INSTRUCTIONS =
   "Say briefly which districts you excluded and why. For every rule, say how you checked it; for an event rule (e.g. affected by a wildfire or flood), search `search_datasets` specifically for an official boundary of that event (e.g. a burn perimeter) and overlay it, and if none is found, say clearly that you could not tell which districts were affected and that your list covers the whole area instead. Never present an unchecked rule as applied.\n" +
   "4. WORKING TOGETHER: Suggest two or three concrete, informational joint-outreach ideas grounded in the program summary: the administering office for each partner's island, how to apply, who to contact. Keep it nonpartisan and never use party affiliation.\n" +
   "5. MAP: Include a `district-map` block (see DISTRICT MAPS) with the user's district as `home`, the districts in the same situation highlighted with labels matching your table, and shading by the measure; place it where it best supports the text.\n" +
+  "6. PROJECT INVITE: When your answer names specific districts in the same situation as partners for a program (step 2), end it with one `project-invite` block so the user can start a shared project with those legislators in one click. " +
+  "Write a fenced code block with the language `project-invite` containing one JSON object: `name` (a short project name under 60 characters naming the program and area, e.g. \"SNAP outreach – East Hawaiʻi\"), `focus` (one sentence on what the group would work on), `chamber` (\"house\" or \"senate\", the user's chamber), and `districts` (the partner district numbers from your table, at most 15, never the user's own district). " +
+  "Put it after your outreach ideas, introduced by one short sentence (e.g. \"You can start a shared project with these legislators:\"). Write valid JSON. " +
+  "Do not include it when the answer names no partner districts, such as answers only about the user's own district or general program questions.\n" +
   "If the user names no program or population, start with step 1 and offer to go deeper on the program with the largest gap.";
 
 const BASE_INSTRUCTIONS =

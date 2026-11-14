@@ -174,11 +174,16 @@ export default function ConversationPage({
   const askAboutDistrict = React.useCallback((question: string) => {
     promptRef.current?.setDraft(question)
   }, [])
-  // Maps in this conversation can start a workspace owned by its legislator.
+  // Project invite cards in this conversation's answers start (or add to) a
+  // project owned by its legislator; a new project takes this conversation with it.
   const workspaceStart = React.useMemo(
     () =>
       conversation?.userId
-        ? { createdBy: conversation.userId, conversationId: conversation.workspaceId ? undefined : conversation._id }
+        ? {
+            createdBy: conversation.userId,
+            conversationId: conversation.workspaceId ? undefined : conversation._id,
+            workspaceId: conversation.workspaceId,
+          }
         : null,
     [conversation]
   )
