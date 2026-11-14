@@ -27,7 +27,8 @@ import {
   Building2,
   Terminal,
   ArrowUpRight,
-  Globe,
+  Quote,
+  Receipt,
   Wrench,
   AlertCircle,
   Landmark,
@@ -97,7 +98,7 @@ function getToolMeta(toolName?: string) {
       }
     case "get_state_tax_collections":
       return {
-        icon: Landmark,
+        icon: Receipt,
         label: "Census State Tax Collections",
         runningText: "Fetching state tax collections...",
         doneText: "Fetched state tax collections",
@@ -105,7 +106,7 @@ function getToolMeta(toolName?: string) {
       }
     case "cite_sources":
       return {
-        icon: Globe,
+        icon: Quote,
         label: "Source Attribution",
         runningText: "Attributing used Hawaii data sources...",
         doneText: "Attributed verified data sources",
@@ -344,7 +345,8 @@ export function AgentTrace({
                     ) : isError ? (
                       <AlertCircle className="size-3.5 text-destructive" />
                     ) : (
-                      <CircleCheckIcon className="size-3.5" aria-hidden="true" />
+                      // A finished step shows what kind of step it was.
+                      <IconComponent className="size-3.5" aria-hidden="true" />
                     )}
                   </TraceIcon>
                   <TraceTitle>{title}</TraceTitle>
