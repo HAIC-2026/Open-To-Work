@@ -189,3 +189,25 @@ export const rename = mutation({
     return null
   },
 })
+
+/**
+ * Remember whether a folder is expanded or collapsed in the sidebar, so the
+ * state survives page reloads and follows the user across devices. Stored in
+ * `defaultOpen`, the same field a folder's initial state comes from.
+ */
+export const setOpen = mutation({
+  args: {
+    id: v.id("folders"),
+    open: v.boolean(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const folder = await ctx.db.get(args.id)
+    // A folder deleted in another tab is not an error; skip unchanged writes.
+    if (!folder || (folder.defaultOpen ?? true) === args.open) {
+      return null
+    }
+    await ctx.db.patch(args.id, { defaultOpen: args.open })
+    return null
+  },
+})

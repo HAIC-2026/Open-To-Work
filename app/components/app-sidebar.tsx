@@ -680,12 +680,24 @@ export function AppSidebar({
   const createFolder = useMutation(api.folders.create)
   const removeFolder = useMutation(api.folders.remove)
   const renameFolder = useMutation(api.folders.rename)
+  // Folder open/closed state is saved on the folder itself. The optimistic
+  // update flips it in the loaded folder list right away, so the toggle feels
+  // instant while the save happens in the background.
+  const setFolderOpenMutation = useMutation(api.folders.setOpen).withOptimisticUpdate(
+    (localStore, { id, open }) => {
+      for (const { args, value } of localStore.getAllQueries(api.folders.listWithConversations)) {
+        if (!value) continue
+        localStore.setQuery(
+          api.folders.listWithConversations,
+          args,
+          value.map((folder) => (folder._id === id ? { ...folder, defaultOpen: open } : folder))
+        )
+      }
+    }
+  )
 
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = React.useState(false)
-
-  // Controlled open/close state for folders
-  const [openFolders, setOpenFolders] = React.useState<Record<string, boolean>>({})
 
   // Dialog state for creating a new project folder
   const [createFolderOpen, setCreateFolderOpen] = React.useState(false)
@@ -708,29 +720,14 @@ export function AppSidebar({
     })
   )
 
-  const isFolderOpen = React.useCallback(
-    (folderId: string, defaultOpen?: boolean) => {
-      return openFolders[folderId] ?? (defaultOpen ?? true)
+  const setFolderOpen = React.useCallback(
+    (folderId: Id<"folders">, open: boolean) => {
+      setFolderOpenMutation({ id: folderId, open }).catch((err) => {
+        console.error("Failed to save folder state", err)
+      })
     },
-    [openFolders]
+    [setFolderOpenMutation]
   )
-
-  const setFolderOpen = React.useCallback((folderId: string, open: boolean) => {
-    setOpenFolders((prev) => ({ ...prev, [folderId]: open }))
-  }, [])
-
-  // Auto-expand folder if the active conversation is inside it
-  React.useEffect(() => {
-    if (!projectFolders || !pathname) return
-    for (const folder of projectFolders) {
-      const hasActiveConv = folder.conversations.some(
-        (conv) => pathname === `/conversations/${conv._id}`
-      )
-      if (hasActiveConv && openFolders[folder._id] === undefined) {
-        setOpenFolders((prev) => ({ ...prev, [folder._id]: true }))
-      }
-    }
-  }, [projectFolders, pathname, openFolders])
 
   const [userMenuOpen, setUserMenuOpen] = React.useState(false)
   const [userSearchQuery, setUserSearchQuery] = React.useState("")
@@ -952,7 +949,7 @@ export function AppSidebar({
                       <DroppableFolderItem
                         key={folder._id}
                         folder={folder}
-                        isOpen={isFolderOpen(folder._id, folder.defaultOpen)}
+                        isOpen={folder.defaultOpen ?? true}
                         onOpenChange={(open) => setFolderOpen(folder._id, open)}
                         activeConv={activeConv}
                         currentPathname={pathname}
@@ -1262,11 +1259,11 @@ export function AppSidebar({
               if (!trimmed) return
               setIsCreatingFolder(true)
               try {
-                const newFolderId = await createFolder({
+                // New folders are created open (folders.create defaults to open).
+                await createFolder({
                   name: trimmed,
                   userId: currentUser._id,
                 })
-                setFolderOpen(newFolderId, true)
                 setNewFolderName("")
                 setCreateFolderOpen(false)
               } catch (err) {
