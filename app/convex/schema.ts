@@ -8,24 +8,68 @@ export default defineSchema({
     photoUrl: v.optional(v.string()),
   }).index("by_district", ["district"]),
 
-  folders: defineTable({
-    name: v.string(),
-    defaultOpen: v.optional(v.boolean()),
-    order: v.optional(v.number()),
-    userId: v.optional(v.id("users")),
-  }).index("by_user", ["userId"]),
-
   conversations: defineTable({
     title: v.string(),
     district: v.optional(v.string()),
-    folderId: v.optional(v.id("folders")),
     threadId: v.optional(v.string()),
     isPinned: v.optional(v.boolean()),
     userId: v.optional(v.id("users")),
     thinking: v.optional(v.boolean()),
+    /**
+     * What the conversation is for. "collaborate" conversations start from the
+     * Collaborate tab: the official's own district first, then other districts in the same situation;
+     * absent or "district" is a normal district conversation.
+     */
+    mode: v.optional(v.union(v.literal("district"), v.literal("collaborate"))),
+    /** The workspace (project) it belongs to; absent = in the owner's Recents. */
+    workspaceId: v.optional(v.id("workspaces")),
+    /** Follow-up questions suggested after the latest answer (cleared when a new question is sent). */
+    suggestions: v.optional(v.array(v.string())),
   })
-    .index("by_user_folder", ["userId", "folderId"])
-    .index("by_folder", ["folderId"]),
+    .index("by_user_workspace", ["userId", "workspaceId"])
+    .index("by_workspace", ["workspaceId"]),
+
+  /**
+   * A project: a space for one legislator, or several working together on
+   * outreach. Shown in the sidebar's Projects list, holding conversations,
+   * a discussion, and members. Demo model: members are added directly (no
+   * invitations), since the app has no login.
+   */
+  workspaces: defineTable({
+    name: v.string(),
+    createdBy: v.id("users"),
+    /** What the group is working on, e.g. the map title it was started from. */
+    focus: v.optional(v.string()),
+  }),
+
+  workspaceMembers: defineTable({
+    workspaceId: v.id("workspaces"),
+    userId: v.id("users"),
+    /** Whether this member has the workspace expanded in their sidebar (default open). */
+    isOpen: v.optional(v.boolean()),
+    /** Position in this member's Projects list (lower first). */
+    order: v.optional(v.number()),
+  })
+    .index("by_workspace", ["workspaceId"])
+    .index("by_user", ["userId"])
+    .index("by_workspace_user", ["workspaceId", "userId"]),
+
+  workspaceMessages: defineTable({
+    workspaceId: v.id("workspaces"),
+    authorId: v.id("users"),
+    body: v.string(),
+  }).index("by_workspace", ["workspaceId"]),
+
+  /** Discussion messages pinned in a workspace (only discussion messages can be pinned). */
+  workspacePins: defineTable({
+    workspaceId: v.id("workspaces"),
+    pinnedBy: v.id("users"),
+    messageId: v.id("workspaceMessages"),
+    /** Copy of the message text when it was pinned. */
+    body: v.string(),
+    /** The message author's name when it was pinned (shown if they leave the project). */
+    sourceLabel: v.string(),
+  }).index("by_workspace", ["workspaceId"]),
 
   messages: defineTable({
     conversationId: v.id("conversations"),

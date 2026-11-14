@@ -3,12 +3,8 @@
 import * as React from "react"
 import {
   ArrowUpIcon,
-  PlusIcon,
   Map,
   ChevronDown,
-  PaperclipIcon,
-  TelescopeIcon,
-  GlobeIcon,
   Folder,
   Check,
   Square,
@@ -61,19 +57,26 @@ const SENATE_DISTRICTS = Array.from(
   (_, i) => `Senate District ${i + 1}`
 )
 
+export interface PromptInputHandle {
+  /** Put text in the box and focus it, without sending. */
+  setDraft: (text: string) => void
+}
+
 export interface PromptInputProps {
-  onSubmit?: (prompt: string, district?: string, folderId?: Id<"folders">) => void
+  onSubmit?: (prompt: string, district?: string, folderId?: Id<"workspaces">) => void
   onStop?: () => void
   placeholder?: string
   isLoading?: boolean
   disabled?: boolean
   className?: string
   showFolderSelect?: boolean
-  selectedFolderId?: Id<"folders">
-  onFolderChange?: (folderId?: Id<"folders">) => void
+  selectedFolderId?: Id<"workspaces">
+  onFolderChange?: (folderId?: Id<"workspaces">) => void
   /** Controlled district. When omitted, the input manages it internally. */
   selectedDistrict?: string
   onDistrictChange?: (district: string) => void
+  /** Imperative controls (a plain prop, like the district map view's handleRef). */
+  handleRef?: React.Ref<PromptInputHandle>
 }
 
 export function PromptInput({
@@ -88,6 +91,7 @@ export function PromptInput({
   onFolderChange,
   selectedDistrict: selectedDistrictProp,
   onDistrictChange,
+  handleRef,
 }: PromptInputProps) {
   const [text, setText] = React.useState("")
   const [activeLegislator] = useActiveLegislator()
@@ -109,18 +113,19 @@ export function PromptInput({
     setDistrictOpen(false)
   }
 
+  // Projects (workspaces) the legislator belongs to.
   const projectFolders = useQuery(
-    api.folders.listWithConversations,
+    api.workspaces.listForSidebar,
     activeLegislator._id ? { userId: activeLegislator._id } : "skip"
   )
-  const [internalFolderId, setInternalFolderId] = React.useState<Id<"folders"> | undefined>(selectedFolderIdProp)
+  const [internalFolderId, setInternalFolderId] = React.useState<Id<"workspaces"> | undefined>(selectedFolderIdProp)
 
   React.useEffect(() => {
     setInternalFolderId(selectedFolderIdProp)
   }, [selectedFolderIdProp])
 
   const currentFolderId = selectedFolderIdProp !== undefined ? selectedFolderIdProp : internalFolderId
-  const handleSelectFolder = (id?: Id<"folders">) => {
+  const handleSelectFolder = (id?: Id<"workspaces">) => {
     setInternalFolderId(id)
     onFolderChange?.(id)
   }
@@ -128,7 +133,16 @@ export function PromptInput({
   const selectedFolder = projectFolders?.find((f) => f._id === currentFolderId)
 
   const formRef = React.useRef<HTMLFormElement>(null)
-  const inputRef = React.useRef<HTMLInputElement>(null)
+  React.useImperativeHandle(
+    handleRef,
+    () => ({
+      setDraft: (draft) => {
+        setText(draft)
+        formRef.current?.querySelector("textarea")?.focus()
+      },
+    }),
+    []
+  )
 
   const isBlocked = disabled || isLoading
   const canSend = text.trim().length > 0 && !isBlocked
@@ -160,48 +174,8 @@ export function PromptInput({
           className="p-3 text-base md:text-base leading-relaxed max-h-48 overflow-y-auto disabled:opacity-50 disabled:cursor-not-allowed"
         />
 
-        <InputGroupAddon align="block-end" className="flex items-center justify-between">
-          {/* Left: Add Context / File attachment DropdownMenu */}
-          <div className="flex items-center">
-            <input
-              type="file"
-              ref={inputRef}
-              className="hidden"
-              multiple
-            />
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <InputGroupButton
-                    size="icon-sm"
-                    variant="outline"
-                    className="rounded-full"
-                    aria-label="Add context"
-                    type="button"
-                  />
-                }
-              >
-                <PlusIcon />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" side="top" className="w-48">
-                <DropdownMenuItem onClick={() => inputRef.current?.click()}>
-                  <PaperclipIcon />
-                  <span>Add Photos & Files</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <TelescopeIcon />
-                  <span>Deep Research</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <GlobeIcon />
-                  <span>Web Search</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-
-          {/* Right: Pair of buttons (District Dropdown + District Map) and Send Button */}
+        <InputGroupAddon align="block-end" className="flex items-center justify-end">
+          {/* Folder, district and map buttons, then the send button */}
           <div className="flex items-center gap-2">
             {/* The pair of buttons */}
             <div className="flex items-center gap-1.5">
@@ -214,27 +188,27 @@ export function PromptInput({
                         size="sm"
                         variant="outline"
                         className="h-8 gap-1.5 rounded-full px-3 text-xs font-normal max-w-[170px]"
-                        title={selectedFolder ? `Folder: ${selectedFolder.name}` : "Select folder"}
+                        title={selectedFolder ? `Project: ${selectedFolder.name}` : "Select project"}
                       />
                     }
                   >
                     <Folder className={cn("size-3.5 shrink-0", selectedFolder ? "text-primary" : "opacity-60")} />
                     <span className="truncate max-w-[100px]">
-                      {selectedFolder ? selectedFolder.name : "Select folder"}
+                      {selectedFolder ? selectedFolder.name : "Select project"}
                     </span>
                     <ChevronDown className="size-3 opacity-60 shrink-0" />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="w-56" align="end" side="top" sideOffset={8}>
                     <DropdownMenuGroup>
                       <DropdownMenuLabel className="text-xs text-muted-foreground font-normal px-2 py-1.5">
-                        Save to Project Folder
+                        Save to Project
                       </DropdownMenuLabel>
                       <DropdownMenuItem
                         onClick={() => handleSelectFolder(undefined)}
                         className="flex items-center gap-2 cursor-pointer"
                       >
                         <span className={cn("text-xs flex-1 truncate", !currentFolderId ? "font-semibold text-primary" : "text-muted-foreground")}>
-                          No folder (Recents)
+                          No project (Recents)
                         </span>
                         {!currentFolderId && <Check className="ml-auto size-3.5 text-primary" />}
                       </DropdownMenuItem>

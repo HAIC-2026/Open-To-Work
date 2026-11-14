@@ -6,7 +6,9 @@ import { useQuery, useMutation } from "convex/react"
 import { useUIMessages, optimisticallySendMessage } from "@convex-dev/agent/react"
 import { api } from "@/convex/_generated/api"
 import type { Id } from "@/convex/_generated/dataModel"
-import { PromptInput } from "@/components/prompt-input"
+import { PromptInput, type PromptInputHandle } from "@/components/prompt-input"
+import { MapAskContext } from "@/components/district-map/district-map-block"
+import { WorkspaceStartContext } from "@/components/workspaces/start-workspace-dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -48,6 +50,7 @@ import {
   CopyIcon,
   CheckIcon,
   PencilIcon,
+  RotateCcw,
 } from "lucide-react"
 
 function MessageAction({
@@ -164,6 +167,24 @@ export default function ConversationPage({
   const { id } = React.use(params)
 
   const conversation = useQuery(api.conversations.get, { id })
+  const promptRef = React.useRef<PromptInputHandle>(null)
+  // Clicking a district on a map puts a follow-up question in the chat box.
+  const askAboutDistrict = React.useCallback((question: string) => {
+    promptRef.current?.setDraft(question)
+  }, [])
+  // Project invite cards in this conversation's answers start (or add to) a
+  // project owned by its legislator; a new project takes this conversation with it.
+  const workspaceStart = React.useMemo(
+    () =>
+      conversation?.userId
+        ? {
+            createdBy: conversation.userId,
+            conversationId: conversation.workspaceId ? undefined : conversation._id,
+            workspaceId: conversation.workspaceId,
+          }
+        : null,
+    [conversation]
+  )
   const threadId = conversation?.threadId
   const threadMessages = useUIMessages(
     api.chat.listThreadMessages,
@@ -261,6 +282,29 @@ export default function ConversationPage({
       setIsResubmitting(false)
     }
   }
+
+  // Regenerate the newest answer: resubmit the latest question unchanged. The
+  // resubmit mutation deletes the old answer (and its tool steps), resets the
+  // Python sandbox and schedules a fresh response; the title is kept.
+  const lastQuestion = [...messages].reverse().find((m) => m.role === "user")
+  const handleRegenerate = async () => {
+    if (!lastQuestion || isResubmitting || isThinking || !conversation) return
+    try {
+      setIsResubmitting(true)
+      await resubmitMessageMutation({
+        conversationId: conversation._id,
+        messageId: lastQuestion._id,
+        content: lastQuestion.content,
+      })
+    } catch (err) {
+      console.error("Failed to regenerate response:", err)
+    } finally {
+      setIsResubmitting(false)
+    }
+  }
+
+  // Follow-up questions for the newest answer (generated in the background once it finishes).
+  const showSuggestions = !isThinking && !isSubmitting && (conversation?.suggestions?.length ?? 0) > 0
 
   const handleSendMessage = async (content: string) => {
     if (!content.trim() || isSubmitting || isThinking || !conversation) return
@@ -364,6 +408,8 @@ export default function ConversationPage({
                 </EmptyHeader>
               </Empty>
             ) : (
+              <WorkspaceStartContext.Provider value={workspaceStart}>
+              <MapAskContext.Provider value={askAboutDistrict}>
               <MessageScroller>
                 <MessageScrollerViewport className="[mask-image:none]">
                   <MessageScrollerContent
@@ -485,6 +531,7 @@ export default function ConversationPage({
                                 <MarkdownRenderer
                                   content={message.content}
                                   citations={extractCitations((message as any).parts)}
+                                  isStreaming={isStreaming}
                                 >
                                   {isStreaming && (
                                     <span
@@ -510,19 +557,48 @@ export default function ConversationPage({
                                   content={message.content}
                                 />
                               )}
-                              {!isPending && Boolean(message.content) && (
+                              {!isPending && (Boolean(message.content) || (isLastAssistantMessage && !isThinking)) && (
                                 <MessageFooter className="px-0">
-                                  <MessageAction
-                                    label={copiedId === message._id ? "Copied" : "Copy"}
-                                    onClick={() => handleCopy(message._id, message.content)}
-                                  >
-                                    {copiedId === message._id ? (
-                                      <CheckIcon className="size-4" />
-                                    ) : (
-                                      <CopyIcon className="size-4" />
-                                    )}
-                                  </MessageAction>
+                                  {Boolean(message.content) && (
+                                    <MessageAction
+                                      label={copiedId === message._id ? "Copied" : "Copy"}
+                                      onClick={() => handleCopy(message._id, message.content)}
+                                    >
+                                      {copiedId === message._id ? (
+                                        <CheckIcon className="size-4" />
+                                      ) : (
+                                        <CopyIcon className="size-4" />
+                                      )}
+                                    </MessageAction>
+                                  )}
+                                  {/* Only the newest answer can be regenerated (it is replaced, not added to). */}
+                                  {isLastAssistantMessage && !isThinking && lastQuestion && (
+                                    <MessageAction
+                                      label="Regenerate"
+                                      onClick={() => void handleRegenerate()}
+                                      disabled={isResubmitting}
+                                    >
+                                      <RotateCcw className="size-4" />
+                                    </MessageAction>
+                                  )}
                                 </MessageFooter>
+                              )}
+                              {/* Follow-up suggestions (shadcn AI Elements "Suggestion"), only under the
+                                  newest answer; they're cleared as soon as another question is sent. */}
+                              {isLastAssistantMessage && showSuggestions && (
+                                <div className="flex flex-wrap gap-2">
+                                  {conversation.suggestions!.map((suggestion) => (
+                                    <Button
+                                      key={suggestion}
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-auto min-h-7 max-w-full py-1 text-left whitespace-normal"
+                                      onClick={() => void handleSendMessage(suggestion)}
+                                    >
+                                      {suggestion}
+                                    </Button>
+                                  ))}
+                                </div>
                               )}
                             </MessageContent>
                           </Message>
@@ -533,6 +609,8 @@ export default function ConversationPage({
                 </MessageScrollerViewport>
                 <MessageScrollerButton className="data-[direction=end]:bottom-[168px] z-30 shadow-md border bg-background/95 backdrop-blur hover:bg-muted" />
               </MessageScroller>
+              </MapAskContext.Provider>
+              </WorkspaceStartContext.Provider>
             )}
           </div>
 
@@ -540,7 +618,14 @@ export default function ConversationPage({
           <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col bg-transparent pb-6 md:pb-8">
             <div className="pointer-events-auto mx-auto w-full max-w-3xl px-6 md:px-8">
               <PromptInput
-                placeholder={isThinking ? "Assistant is thinking..." : "Ask about this district..."}
+                handleRef={promptRef}
+                placeholder={
+                  isThinking
+                    ? "Assistant is thinking..."
+                    : conversation.mode === "collaborate"
+                      ? "Ask about programs for your district, or who to partner with..."
+                      : "Ask about this district..."
+                }
                 onSubmit={handleSendMessage}
                 onStop={handleStopThinking}
                 isLoading={isSubmitting || isThinking || isHalting}

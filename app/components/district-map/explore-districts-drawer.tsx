@@ -61,7 +61,7 @@ type LoadState<T> = { key: string; data?: T; error?: string }
  * and superseded responses are ignored (React docs: "Fetching data" with
  * cleanup to avoid race conditions).
  */
-function useLiveData<T>(
+export function useLiveData<T>(
   key: string | null,
   load: (signal: AbortSignal) => Promise<T>
 ): { data?: T; error?: string; loading: boolean; retry: () => void } {
