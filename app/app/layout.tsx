@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import { Geist, Geist_Mono, Inter } from "next/font/google"
 
 import "./globals.css"
@@ -12,6 +13,13 @@ const fontMono = Geist_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
 })
+
+// Branding matches the Mohala reference app (HAIC-DEMO): tab title "Mohala"
+// and the green Mohala flower as the icon (app/icon.svg, picked up by Next.js).
+export const metadata: Metadata = {
+  title: "Mohala",
+  description: "District research with Pua.",
+}
 
 export default function RootLayout({
   children,

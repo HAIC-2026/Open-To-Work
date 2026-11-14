@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import {
   Plus,
+  CirclePlus,
   UsersRound,
   MoreVertical,
   Pin,
@@ -820,9 +821,9 @@ export function AppSidebar({
   const mainNavItems = [
     // Collaborate is a mode (tab) on the New page.
     {
-      title: "New",
+      title: "New Conversation",
       url: "/new",
-      icon: Plus,
+      icon: CirclePlus,
     },
   ]
 
@@ -924,7 +925,7 @@ export function AppSidebar({
 
         {/* Sidebar Content */}
         <SidebarContent>
-          {/* Main top item: New (Research and Collaborate modes are tabs on that page) */}
+          {/* Main top item: New conversation (Research and Collaborate modes are tabs on that page) */}
           <SidebarGroup>
             <SidebarGroupContent>
               <SidebarMenu>
@@ -933,10 +934,12 @@ export function AppSidebar({
                   const isActive = pathname === item.url
                   return (
                     <SidebarMenuItem key={item.title}>
+                      {/* The New button uses the primary color so it stands out from the rest of the sidebar. */}
                       <SidebarMenuButton
                         render={<Link href={item.url} />}
                         isActive={isActive}
                         tooltip={item.title}
+                        className="justify-center bg-primary font-medium text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground data-active:bg-primary data-active:text-primary-foreground"
                       >
                         <Icon className="size-4" />
                         <span>{item.title}</span>
