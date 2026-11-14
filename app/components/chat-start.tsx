@@ -27,14 +27,23 @@ export interface ChatStartProps {
   /** "collaborate" starts conversations that put partner-finding first. */
   mode?: "district" | "collaborate"
   placeholder?: string
+  /** Show the prompt box's project picker (default true). Collaborate hides it. */
+  showProjectSelect?: boolean
 }
 
 /**
  * Start screen for a new conversation: headline, prompt box, and preset
- * buttons. Shared by the New and Collaborate tabs. Uses useSearchParams, so
+ * buttons. Shared by the New page's Research and Collaborate modes. Uses useSearchParams, so
  * render it inside a Suspense boundary (Next.js useSearchParams docs).
  */
-export function ChatStart({ heading, icon: HeadingIcon, presets, mode, placeholder }: ChatStartProps) {
+export function ChatStart({
+  heading,
+  icon: HeadingIcon,
+  presets,
+  mode,
+  placeholder,
+  showProjectSelect = true,
+}: ChatStartProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   // ?workspaceId=... preselects a project (from a project's "+" button).
@@ -92,7 +101,7 @@ export function ChatStart({ heading, icon: HeadingIcon, presets, mode, placehold
 
   const handleSubmit = (prompt: string, district?: string, folderId?: Id<"workspaces">) => {
     if (!prompt.trim()) return
-    void startConversation({ title: prompt, district, folderId })
+    void startConversation({ title: prompt, district, folderId: showProjectSelect ? folderId : undefined })
   }
 
   const handlePreset = async (preset: ChatStartPreset) => {
@@ -103,7 +112,7 @@ export function ChatStart({ heading, icon: HeadingIcon, presets, mode, placehold
       // a background job replaces the title with a short LLM-written one.
       title: preset.prompt,
       district: selectedDistrict,
-      folderId: selectedFolderId,
+      folderId: showProjectSelect ? selectedFolderId : undefined,
     })
     if (!ok) setPendingPresetId(null)
   }
@@ -126,7 +135,7 @@ export function ChatStart({ heading, icon: HeadingIcon, presets, mode, placehold
             onSubmit={handleSubmit}
             isLoading={isSubmitting}
             placeholder={placeholder}
-            showFolderSelect={true}
+            showFolderSelect={showProjectSelect}
             selectedFolderId={selectedFolderId}
             onFolderChange={setSelectedFolderId}
             selectedDistrict={selectedDistrict}

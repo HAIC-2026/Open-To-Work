@@ -6,7 +6,6 @@ import { usePathname, useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import {
   Plus,
-  Users,
   UsersRound,
   MoreVertical,
   Pin,
@@ -819,15 +818,11 @@ export function AppSidebar({
   )
 
   const mainNavItems = [
+    // Collaborate is a mode (tab) on the New page.
     {
       title: "New",
       url: "/new",
       icon: Plus,
-    },
-    {
-      title: "Collaborate",
-      url: "/collaborate",
-      icon: Users,
     },
   ]
 
@@ -929,7 +924,7 @@ export function AppSidebar({
 
         {/* Sidebar Content */}
         <SidebarContent>
-          {/* Main top tabs: New, Collaborate */}
+          {/* Main top item: New (Research and Collaborate modes are tabs on that page) */}
           <SidebarGroup>
             <SidebarGroupContent>
               <SidebarMenu>
