@@ -10,16 +10,16 @@ const conversationValidator = v.object({
   _creationTime: v.number(),
   title: v.string(),
   district: v.optional(v.string()),
-  folderId: v.optional(v.id("folders")),
   threadId: v.optional(v.string()),
   isPinned: v.optional(v.boolean()),
   userId: v.optional(v.id("users")),
   thinking: v.optional(v.boolean()),
   mode: v.optional(v.union(v.literal("district"), v.literal("collaborate"))),
+  workspaceId: v.optional(v.id("workspaces")),
 })
 
 /**
- * Recent conversations (not in a folder), newest first, one page at a time.
+ * Recent conversations (not in a workspace), newest first, one page at a time.
  * Paginated per the Convex pagination docs so the sidebar can keep loading
  * older conversations with `usePaginatedQuery` instead of a fixed `.take(20)`.
  */
@@ -47,8 +47,8 @@ export const list = query({
 
     return await ctx.db
       .query("conversations")
-      .withIndex("by_user_folder", (q) =>
-        q.eq("userId", targetUserId).eq("folderId", undefined)
+      .withIndex("by_user_workspace", (q) =>
+        q.eq("userId", targetUserId).eq("workspaceId", undefined)
       )
       .order("desc")
       .paginate(args.paginationOpts)
@@ -64,12 +64,12 @@ export const get = query({
       _creationTime: v.number(),
       title: v.string(),
       district: v.optional(v.string()),
-      folderId: v.optional(v.id("folders")),
       threadId: v.optional(v.string()),
       isPinned: v.optional(v.boolean()),
       userId: v.optional(v.id("users")),
       thinking: v.optional(v.boolean()),
       mode: v.optional(v.union(v.literal("district"), v.literal("collaborate"))),
+      workspaceId: v.optional(v.id("workspaces")),
     })
   ),
   handler: async (ctx, args) => {
@@ -137,9 +137,10 @@ export const create = mutation({
     prompt: v.optional(v.string()),
     userId: v.optional(v.id("users")),
     district: v.optional(v.string()),
-    folderId: v.optional(v.id("folders")),
     // "collaborate" for conversations started from the Collaborate tab.
     mode: v.optional(v.union(v.literal("district"), v.literal("collaborate"))),
+    // Put the new conversation in a workspace (shared with its members).
+    workspaceId: v.optional(v.id("workspaces")),
   },
   returns: v.id("conversations"),
   handler: async (ctx, args) => {
@@ -160,13 +161,15 @@ export const create = mutation({
       }
     }
 
-    if (args.folderId) {
-      const folder = await ctx.db.get(args.folderId)
-      if (!folder) {
-        throw new Error("Folder not found")
-      }
-      if (folder.userId && targetUserId && folder.userId !== targetUserId) {
-        throw new Error("Cannot save conversation into another user's folder")
+    if (args.workspaceId && targetUserId) {
+      const membership = await ctx.db
+        .query("workspaceMembers")
+        .withIndex("by_workspace_user", (q) =>
+          q.eq("workspaceId", args.workspaceId!).eq("userId", targetUserId!)
+        )
+        .unique()
+      if (!membership) {
+        throw new Error("Only workspace members can add conversations to it")
       }
     }
 
@@ -177,12 +180,12 @@ export const create = mutation({
     const conversationId = await ctx.db.insert("conversations", {
       title: trimmedTitle,
       district: args.district,
-      folderId: args.folderId,
       threadId,
       isPinned: false,
       userId: targetUserId,
       thinking: true,
       mode: args.mode,
+      workspaceId: args.workspaceId,
     })
 
     // Save first user prompt message into the agent thread
@@ -267,10 +270,26 @@ export const togglePin = mutation({
   },
 })
 
-export const moveToFolder = mutation({
+/** Rename a conversation (its title in the sidebar, project page and header). */
+export const rename = mutation({
+  args: { id: v.id("conversations"), title: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const title = args.title.trim()
+    if (!title) throw new Error("Conversation name cannot be empty")
+    if (title.length > 200) throw new Error("Conversation names are limited to 200 characters")
+    const conv = await ctx.db.get(args.id)
+    if (!conv) throw new Error("Conversation not found")
+    if (conv.title !== title) await ctx.db.patch(args.id, { title })
+    return null
+  },
+})
+
+/** Move a conversation into a workspace, or back to Recents (no workspace). */
+export const moveToWorkspace = mutation({
   args: {
     id: v.id("conversations"),
-    folderId: v.optional(v.id("folders")),
+    workspaceId: v.optional(v.id("workspaces")),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -278,18 +297,18 @@ export const moveToFolder = mutation({
     if (!conv) {
       throw new Error("Conversation not found")
     }
-    if (args.folderId) {
-      const folder = await ctx.db.get(args.folderId)
-      if (!folder) {
-        throw new Error("Folder not found")
-      }
-      if (folder.userId && conv.userId && folder.userId !== conv.userId) {
-        throw new Error("Cannot move conversation to another user's folder")
+    if (args.workspaceId && conv.userId) {
+      const membership = await ctx.db
+        .query("workspaceMembers")
+        .withIndex("by_workspace_user", (q) =>
+          q.eq("workspaceId", args.workspaceId!).eq("userId", conv.userId!)
+        )
+        .unique()
+      if (!membership) {
+        throw new Error("Only workspace members can add conversations to it")
       }
     }
-    await ctx.db.patch(args.id, {
-      folderId: args.folderId,
-    })
+    await ctx.db.patch(args.id, { workspaceId: args.workspaceId })
     return null
   },
 })

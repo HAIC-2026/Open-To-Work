@@ -6,9 +6,10 @@ import { LEGISLATOR_ROSTER } from "./legislatorRoster"
 
 /**
  * Resets the app to its original state: deletes every conversation, agent
- * thread (messages, streams), folder and user, then seeds the 76 legislators
- * (real names and official photos from legislatorRoster.ts) with their starter
- * folders and sample conversations. The public program inventory (`programs`
+ * thread (messages, streams), workspace and user, then seeds the 76 legislators
+ * (real names and official photos from legislatorRoster.ts), each with three
+ * starter projects (workspaces with just that legislator) and sample
+ * conversations. The public program inventory (`programs`
  * table) is reference data and is left untouched; fill or update it with
  * `npx convex run programs:refresh`. Internal, so only you can run it:
  *
@@ -20,8 +21,8 @@ import { LEGISLATOR_ROSTER } from "./legislatorRoster"
  * Convex's 1-second mutation execution limit.
  */
 
-/** Starter folders and sample conversations for one district. */
-function defaultFolders(districtLabel: string) {
+/** Starter projects (workspaces) and sample conversations for one district. */
+function defaultProjects(districtLabel: string) {
 return [
     {
       name: "District Initiatives",
@@ -152,7 +153,15 @@ return [
   ]
 }
 
-const APP_TABLES = ["messages", "conversations", "folders", "users"] as const
+const APP_TABLES = [
+  "workspacePins",
+  "workspaceMessages",
+  "workspaceMembers",
+  "workspaces",
+  "messages",
+  "conversations",
+  "users",
+] as const
 
 /** Deletes up to `batchSize` documents from one app table; returns how many. */
 export const deleteBatch = internalMutation({
@@ -168,7 +177,7 @@ export const deleteBatch = internalMutation({
   },
 })
 
-/** Creates one legislator and their starter folders and sample conversations. */
+/** Creates one legislator with their starter projects and sample conversations. */
 export const seedLegislator = internalMutation({
   args: {
     district: v.string(),
@@ -189,15 +198,19 @@ export const seedLegislator = internalMutation({
       ? `House District ${num}`
       : `Senate District ${num}`
 
-    for (const folderData of defaultFolders(districtLabel)) {
-      const folderId = await ctx.db.insert("folders", {
-        name: folderData.name,
-        defaultOpen: folderData.defaultOpen,
-        order: folderData.order,
+    for (const project of defaultProjects(districtLabel)) {
+      const workspaceId = await ctx.db.insert("workspaces", {
+        name: project.name,
+        createdBy: userId,
+      })
+      await ctx.db.insert("workspaceMembers", {
+        workspaceId,
         userId,
+        isOpen: project.defaultOpen,
+        order: project.order,
       })
 
-      for (const convData of folderData.conversations) {
+      for (const convData of project.conversations) {
         const threadId = await createThread(ctx, components.agent, {
           title: convData.title,
         })
@@ -205,7 +218,7 @@ export const seedLegislator = internalMutation({
         await ctx.db.insert("conversations", {
           title: convData.title,
           district: convData.district,
-          folderId,
+          workspaceId,
           threadId,
           isPinned: false,
           userId,
@@ -282,7 +295,7 @@ export const seed = internalAction({
       }
     }
 
-    // 3. Seed the legislators and their starter folders, one per transaction.
+    // 3. Seed the legislators and their starter projects, one per transaction.
     for (const l of LEGISLATOR_ROSTER) {
       await ctx.runMutation(internal.seed.seedLegislator, {
         district: l.district,

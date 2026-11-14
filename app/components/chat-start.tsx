@@ -37,14 +37,15 @@ export interface ChatStartProps {
 export function ChatStart({ heading, icon: HeadingIcon, presets, mode, placeholder }: ChatStartProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const folderIdParam = searchParams.get("folderId") as Id<"folders"> | null
+  // ?workspaceId=... preselects a project (from a project's "+" button).
+  const folderIdParam = searchParams.get("workspaceId") as Id<"workspaces"> | null
 
   const createConversation = useMutation(api.conversations.create)
   const [activeLegislator] = useActiveLegislator()
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [pendingPresetId, setPendingPresetId] = React.useState<string | null>(null)
 
-  const [selectedFolderId, setSelectedFolderId] = React.useState<Id<"folders"> | undefined>(
+  const [selectedFolderId, setSelectedFolderId] = React.useState<Id<"workspaces"> | undefined>(
     folderIdParam ?? undefined
   )
 
@@ -69,7 +70,7 @@ export function ChatStart({ heading, icon: HeadingIcon, presets, mode, placehold
     title: string
     prompt?: string
     district?: string
-    folderId?: Id<"folders">
+    folderId?: Id<"workspaces">
   }) => {
     if (!args.title.trim() || isSubmitting) return false
     try {
@@ -78,7 +79,7 @@ export function ChatStart({ heading, icon: HeadingIcon, presets, mode, placehold
         title: args.title.trim(),
         prompt: args.prompt,
         district: args.district,
-        folderId: args.folderId,
+        workspaceId: args.folderId,
         userId: activeLegislator._id,
         mode,
       })
@@ -91,7 +92,7 @@ export function ChatStart({ heading, icon: HeadingIcon, presets, mode, placehold
     }
   }
 
-  const handleSubmit = (prompt: string, district?: string, folderId?: Id<"folders">) => {
+  const handleSubmit = (prompt: string, district?: string, folderId?: Id<"workspaces">) => {
     if (!prompt.trim()) return
     void startConversation({ title: prompt, district, folderId })
   }

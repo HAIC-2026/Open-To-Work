@@ -24,8 +24,10 @@ import {
   type DistrictShapes,
   type Island,
 } from "@/lib/district-map"
+import { UsersRound } from "lucide-react"
+import { StartWorkspaceDialog, WorkspaceStartContext } from "@/components/workspaces/start-workspace-dialog"
 import { useLiveData } from "./explore-districts-drawer"
-import { GROUP_FILLS, type MapBlockDistrict } from "./district-map-block-view"
+import { GROUP_FILLS, type MapBlockDistrict } from "./map-block-types"
 
 // Leaflet needs `window`, so load the map on the client only (Next.js
 // lazy-loading guide: `ssr: false` must be used from a Client Component).
@@ -136,6 +138,8 @@ export function DistrictMapBlock({ source, isStreaming }: DistrictMapBlockProps)
 
 function MapCard({ spec }: { spec: MapSpec }) {
   const askAbout = React.useContext(MapAskContext)
+  const workspaceInfo = React.useContext(WorkspaceStartContext)
+  const [workspaceOpen, setWorkspaceOpen] = React.useState(false)
   const chamberLabel = CHAMBERS[spec.chamber].label
   const shapesState = useLiveData<DistrictShapes>(`map-block-shapes:${spec.chamber}`, () =>
     loadDistrictShapes(spec.chamber)
@@ -381,11 +385,29 @@ function MapCard({ spec }: { spec: MapSpec }) {
         </ul>
       </CardContent>
 
-      {(spec.caption || askAbout) && (
-        <CardFooter className="flex-col items-start gap-1 text-xs text-muted-foreground">
-          {spec.caption && <span>{spec.caption}</span>}
-          {askAbout && <span>Click a district to ask about it.</span>}
+      {(spec.caption || askAbout || (workspaceInfo && highlights.length > 0)) && (
+        <CardFooter className="flex-wrap items-end justify-between gap-3 text-xs text-muted-foreground">
+          <div className="flex flex-col gap-1">
+            {spec.caption && <span>{spec.caption}</span>}
+            {askAbout && <span>Click a district to ask about it.</span>}
+          </div>
+          {workspaceInfo && highlights.length > 0 && (
+            <Button variant="outline" size="sm" onClick={() => setWorkspaceOpen(true)}>
+              <UsersRound data-icon="inline-start" />
+              Start a shared project with these legislators
+            </Button>
+          )}
         </CardFooter>
+      )}
+      {workspaceInfo && highlights.length > 0 && (
+        <StartWorkspaceDialog
+          open={workspaceOpen}
+          onOpenChange={setWorkspaceOpen}
+          chamber={spec.chamber}
+          districts={highlights.map((h) => h.district)}
+          defaultName={spec.title}
+          focus={spec.title}
+        />
       )}
     </Card>
   )

@@ -12,17 +12,7 @@ import {
   type DistrictProperties,
   type DistrictShapes,
 } from "@/lib/district-map"
-
-/** How one district is drawn, as set by the agent's map block. */
-export interface MapBlockDistrict {
-  kind: "home" | "highlight" | "dim"
-  /** Short text drawn on the map, e.g. a rank matching the answer's table. */
-  label?: string
-  /** Index into the legend's highlight groups (highlight only). */
-  group?: number
-  /** Lines for the hover tooltip. */
-  tooltip: string[]
-}
+import { GROUP_FILLS, type MapBlockDistrict } from "./map-block-types"
 
 interface DistrictMapBlockViewProps {
   /** Districts to draw (already filtered to one island group). */
@@ -36,9 +26,6 @@ interface DistrictMapBlockViewProps {
   describeOther: (district: number) => string[]
   onSelectDistrict: (district: number) => void
 }
-
-/** Fills for highlight groups when there is no shading, in legend order. */
-export const GROUP_FILLS = ["fill-chart-2", "fill-chart-4", "fill-chart-1", "fill-chart-3"]
 
 const FIT_OPTIONS = { padding: [16, 16] as [number, number] }
 

@@ -8,6 +8,7 @@ import { api } from "@/convex/_generated/api"
 import type { Id } from "@/convex/_generated/dataModel"
 import { PromptInput, type PromptInputHandle } from "@/components/prompt-input"
 import { MapAskContext } from "@/components/district-map/district-map-block"
+import { WorkspaceStartContext } from "@/components/workspaces/start-workspace-dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -49,7 +50,9 @@ import {
   CopyIcon,
   CheckIcon,
   PencilIcon,
+  Pin,
 } from "lucide-react"
+import { useActiveLegislator } from "@/lib/legislators"
 
 function MessageAction({
   label,
@@ -170,6 +173,14 @@ export default function ConversationPage({
   const askAboutDistrict = React.useCallback((question: string) => {
     promptRef.current?.setDraft(question)
   }, [])
+  // Maps in this conversation can start a workspace owned by its legislator.
+  const workspaceStart = React.useMemo(
+    () =>
+      conversation?.userId
+        ? { createdBy: conversation.userId, conversationId: conversation.workspaceId ? undefined : conversation._id }
+        : null,
+    [conversation]
+  )
   const threadId = conversation?.threadId
   const threadMessages = useUIMessages(
     api.chat.listThreadMessages,
@@ -188,6 +199,15 @@ export default function ConversationPage({
     }
   )
   const resubmitMessageMutation = useMutation(api.chat.resubmitMessage)
+  // Answers in a project's conversations can be pinned in its workspace.
+  const users = useQuery(api.users.list)
+  const [me] = useActiveLegislator(users)
+  const projectId = conversation?.workspaceId
+  const project = useQuery(api.workspaces.get, projectId ? { id: projectId } : "skip")
+  const projectPins = useQuery(api.workspaces.listPins, projectId ? { workspaceId: projectId } : "skip")
+  const pinMutation = useMutation(api.workspaces.pin)
+  const canPin = Boolean(project && me._id && project.members.some((m) => m._id === me._id))
+  const pinnedBodies = React.useMemo(() => new Set(projectPins?.map((p) => p.body)), [projectPins])
   const stopThinkingMutation = useMutation(api.chat.stopThinking)
   const [isHalting, setIsHalting] = React.useState(false)
 
@@ -370,6 +390,7 @@ export default function ConversationPage({
                 </EmptyHeader>
               </Empty>
             ) : (
+              <WorkspaceStartContext.Provider value={workspaceStart}>
               <MapAskContext.Provider value={askAboutDistrict}>
               <MessageScroller>
                 <MessageScrollerViewport className="[mask-image:none]">
@@ -530,6 +551,36 @@ export default function ConversationPage({
                                       <CopyIcon className="size-4" />
                                     )}
                                   </MessageAction>
+                                  {canPin && project && me._id && !isMessageThinking && (
+                                    pinnedBodies.has(message.content.trim()) ? (
+                                      <span className="flex items-center gap-1.5 px-2 text-xs text-muted-foreground">
+                                        <Pin className="size-3.5" /> Pinned in {project.name}
+                                      </span>
+                                    ) : (
+                                      <MessageAction
+                                        label={`Pin in ${project.name} workspace`}
+                                        onClick={() =>
+                                          void pinMutation({
+                                            workspaceId: project._id,
+                                            pinnedBy: me._id!,
+                                            body: message.content,
+                                            sourceLabel: conversation.title,
+                                            conversationId: conversation._id,
+                                            citations: extractCitations("parts" in message ? message.parts : undefined)
+                                              .filter((c) => typeof c.number === "number")
+                                              .map((c) => ({
+                                                number: c.number as number,
+                                                url: c.url,
+                                                title: c.title,
+                                                organization: c.organization,
+                                              })),
+                                          })
+                                        }
+                                      >
+                                        <Pin className="size-4" />
+                                      </MessageAction>
+                                    )
+                                  )}
                                 </MessageFooter>
                               )}
                             </MessageContent>
@@ -542,6 +593,7 @@ export default function ConversationPage({
                 <MessageScrollerButton className="data-[direction=end]:bottom-[168px] z-30 shadow-md border bg-background/95 backdrop-blur hover:bg-muted" />
               </MessageScroller>
               </MapAskContext.Provider>
+              </WorkspaceStartContext.Provider>
             )}
           </div>
 

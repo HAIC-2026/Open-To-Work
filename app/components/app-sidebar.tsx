@@ -7,10 +7,12 @@ import { useTheme } from "next-themes"
 import {
   Plus,
   Users,
+  UsersRound,
   MoreVertical,
   Pin,
   Folder,
   FolderOpen,
+  ChevronRight,
   MessageSquare,
   Loader2,
   ChevronsUpDown,
@@ -92,6 +94,7 @@ import { useQuery, useMutation, usePaginatedQuery } from "convex/react"
 import { api } from "@/convex/_generated/api"
 import type { Id } from "@/convex/_generated/dataModel"
 import { cn } from "@/lib/utils"
+import { RenameConversationDialog, type RenameTarget } from "@/components/rename-conversation-dialog"
 import { useActiveLegislator, INITIAL_LEGISLATORS, formatDistrictTitle, getChamber, type LegislatorUser } from "@/lib/legislators"
 
 export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
@@ -105,7 +108,7 @@ interface DraggedConversationData {
   type: "conversation"
   conversationId: Id<"conversations">
   title: string
-  currentFolderId?: Id<"folders">
+  currentFolderId?: Id<"workspaces">
 }
 
 function SidebarMenuAction({
@@ -178,13 +181,14 @@ interface DraggableFolderConversationItemProps {
     _id: Id<"conversations">
     title: string
     isPinned?: boolean
-    folderId?: Id<"folders">
+    workspaceId?: Id<"workspaces">
     thinking?: boolean
   }
-  folderId: Id<"folders">
+  folderId: Id<"workspaces">
   isActive: boolean
   onTogglePin: (id: Id<"conversations">) => Promise<void>
   onDelete: (id: Id<"conversations">, isActive: boolean) => Promise<void>
+  onRename: (conv: RenameTarget) => void
 }
 
 function DraggableFolderConversationItem({
@@ -193,6 +197,7 @@ function DraggableFolderConversationItem({
   isActive,
   onTogglePin,
   onDelete,
+  onRename,
 }: DraggableFolderConversationItemProps) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `conv-${conv._id}`,
@@ -224,6 +229,12 @@ function DraggableFolderConversationItem({
             these match the icons in Recents instead. */}
         {conv.thinking ? (
           <Loader2 className="size-4 shrink-0 text-primary! animate-spin" />
+        ) : conv.isPinned ? (
+          // Pinned: a solid pin, which turns back into the chat icon on hover (the pin button then shows on the right).
+          <>
+            <Pin className="size-4 shrink-0 fill-current text-muted-foreground! group-hover/subitem:hidden group-has-[:focus-visible]/subitem:hidden" />
+            <MessageSquare className="hidden size-4 shrink-0 text-muted-foreground! group-hover/subitem:block group-has-[:focus-visible]/subitem:block" />
+          </>
         ) : (
           <MessageSquare className="size-4 shrink-0 text-muted-foreground!" />
         )}
@@ -233,10 +244,7 @@ function DraggableFolderConversationItem({
       {/* Action buttons (Pin, More) using dedicated SidebarMenuSubAction primitives */}
       <SidebarMenuSubAction
         showOnHover
-        className={cn(
-          "size-7 right-9",
-          conv.isPinned && "md:opacity-100"
-        )}
+        className="size-7 right-9"
         title={conv.isPinned ? "Unpin conversation" : "Pin conversation"}
         onPointerDown={(e: React.PointerEvent) => e.stopPropagation()}
         onClick={async (e: React.MouseEvent) => {
@@ -272,6 +280,10 @@ function DraggableFolderConversationItem({
           }
         />
         <DropdownMenuContent align="end" side="right" sideOffset={4}>
+          <DropdownMenuItem onClick={() => onRename({ _id: conv._id, title: conv.title })}>
+            <Pencil className="size-4" />
+            <span>Rename</span>
+          </DropdownMenuItem>
           <DropdownMenuItem
             variant="destructive"
             onClick={async (e) => {
@@ -294,25 +306,27 @@ function DraggableFolderConversationItem({
 // ---------------------------------------------------------------------------
 interface DroppableFolderItemProps {
   folder: {
-    _id: Id<"folders">
+    _id: Id<"workspaces">
     name: string
-    defaultOpen?: boolean
+    memberCount: number
     conversations: Array<{
       _id: Id<"conversations">
       title: string
       isPinned?: boolean
-      folderId?: Id<"folders">
+      workspaceId?: Id<"workspaces">
+      thinking?: boolean
     }>
   }
   isOpen: boolean
   onOpenChange: (open: boolean) => void
   activeConv: DraggedConversationData | null
   currentPathname: string
-  onRemoveFolder: (id: Id<"folders">) => Promise<void>
-  onStartRenameFolder: (folder: { id: Id<"folders">; name: string }) => void
-  onNavigateToNewWithFolder: (folderId: Id<"folders">) => void
+  onRemoveFolder: (id: Id<"workspaces">) => Promise<void>
+  onStartRenameFolder: (folder: { id: Id<"workspaces">; name: string }) => void
+  onNavigateToNewWithFolder: (folderId: Id<"workspaces">) => void
   onTogglePin: (id: Id<"conversations">) => Promise<void>
   onDeleteConversation: (id: Id<"conversations">, isActive: boolean) => Promise<void>
+  onRenameConversation: (conv: RenameTarget) => void
 }
 
 function DroppableFolderItem({
@@ -326,6 +340,7 @@ function DroppableFolderItem({
   onNavigateToNewWithFolder,
   onTogglePin,
   onDeleteConversation,
+  onRenameConversation,
 }: DroppableFolderItemProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: `folder-${folder._id}`,
@@ -338,6 +353,7 @@ function DroppableFolderItem({
 
   // Only highlight if dragging an item that is NOT already in this folder
   const isDropTarget = isOver && activeConv && activeConv.currentFolderId !== folder._id
+  const isPageActive = currentPathname === `/workspaces/${folder._id}`
 
   return (
     <Collapsible
@@ -354,19 +370,38 @@ function DroppableFolderItem({
       >
         {/* Scoped Folder Header Row */}
         <div className="group/folder-row relative">
-          {/* Folder Trigger Button */}
-          <CollapsibleTrigger
-            render={
-              <SidebarMenuButton
-                tooltip={folder.name}
-                className="h-8 pr-16"
-              >
+          {/* Project name: opens the workspace page */}
+          <SidebarMenuButton
+            render={<Link href={`/workspaces/${folder._id}`} />}
+            isActive={isPageActive}
+            tooltip={folder.name}
+            // Room on the left for the chevron; the button's own rule for a
+            // leading icon (has-[>svg:first-child]:pl-2.5) needs matching too.
+            className="h-8 pl-9 pr-16 has-[>svg:first-child]:pl-9"
+          >
+            {folder.memberCount > 1 ? (
+              <UsersRound className="size-4 text-muted-foreground" />
+            ) : (
+              <>
                 <Folder className="size-4 group-data-open/collapsible:hidden text-muted-foreground" />
                 <FolderOpen className="size-4 hidden group-data-open/collapsible:block text-muted-foreground" />
-                <span className="truncate">{folder.name}</span>
-              </SidebarMenuButton>
+              </>
+            )}
+            <span className="truncate">{folder.name}</span>
+          </SidebarMenuButton>
+
+          {/* Chevron: shows or hides the project's conversations */}
+          <CollapsibleTrigger
+            render={
+              <SidebarMenuAction
+                className="left-1 right-auto size-7 text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                aria-label={isOpen ? `Hide conversations in ${folder.name}` : `Show conversations in ${folder.name}`}
+                onPointerDown={(e: React.PointerEvent) => e.stopPropagation()}
+              />
             }
-          />
+          >
+            <ChevronRight className="size-4 transition-transform group-data-open/collapsible:rotate-90" />
+          </CollapsibleTrigger>
 
           {/* Actions for Folder using dedicated SidebarMenuAction primitives */}
           {/* 3-dots Menu Action (Rename, Delete) */}
@@ -376,12 +411,12 @@ function DroppableFolderItem({
                 <SidebarMenuAction
                   showOnHover
                   className="size-7 right-9 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                  title="Folder options"
+                  title="Project options"
                   onPointerDown={(e: React.PointerEvent) => e.stopPropagation()}
                   onClick={(e: React.MouseEvent) => e.stopPropagation()}
                 >
                   <MoreVertical className="size-4" />
-                  <span className="sr-only">Folder options</span>
+                  <span className="sr-only">Project options</span>
                 </SidebarMenuAction>
               }
             />
@@ -410,11 +445,11 @@ function DroppableFolderItem({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Add conversation to folder action */}
+          {/* New conversation in this project */}
           <SidebarMenuAction
             showOnHover
             className="size-7 right-1 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-            title="Add to folder"
+            title="New conversation in this project"
             onPointerDown={(e: React.PointerEvent) => e.stopPropagation()}
             onClick={(e: React.MouseEvent) => {
               e.preventDefault()
@@ -423,7 +458,7 @@ function DroppableFolderItem({
             }}
           >
             <Plus className="size-4" />
-            <span className="sr-only">Add to folder</span>
+            <span className="sr-only">New conversation in this project</span>
           </SidebarMenuAction>
         </div>
 
@@ -432,7 +467,7 @@ function DroppableFolderItem({
           <SidebarMenuSub className="ml-3.5 mr-0 pl-2.5 pr-0">
             {folder.conversations.length === 0 ? (
               <div className="px-2 py-1.5 text-xs text-muted-foreground/80 italic">
-                {isDropTarget ? "Drop to add here" : "Empty folder"}
+                {isDropTarget ? "Drop to add here" : "No conversations yet"}
               </div>
             ) : (
               folder.conversations.map((conv) => {
@@ -445,6 +480,7 @@ function DroppableFolderItem({
                     isActive={isConvActive}
                     onTogglePin={onTogglePin}
                     onDelete={onDeleteConversation}
+                    onRename={onRenameConversation}
                   />
                 )
               })
@@ -464,15 +500,18 @@ interface DraggableRecentConversationItemProps {
     _id: Id<"conversations">
     title: string
     thinking?: boolean
+    isPinned?: boolean
   }
   isActive: boolean
   onDelete: (id: Id<"conversations">, isActive: boolean) => Promise<void>
+  onRename: (conv: RenameTarget) => void
 }
 
 function DraggableRecentConversationItem({
   conv,
   isActive,
   onDelete,
+  onRename,
 }: DraggableRecentConversationItemProps) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `conv-${conv._id}`,
@@ -502,6 +541,11 @@ function DraggableRecentConversationItem({
       >
         {conv.thinking ? (
           <Loader2 className="size-4 shrink-0 text-primary animate-spin" />
+        ) : conv.isPinned ? (
+          <>
+            <Pin className="size-4 shrink-0 fill-current text-muted-foreground group-hover/recent-item:hidden group-has-[:focus-visible]/recent-item:hidden" />
+            <MessageSquare className="hidden size-4 shrink-0 text-muted-foreground group-hover/recent-item:block group-has-[:focus-visible]/recent-item:block" />
+          </>
         ) : (
           <MessageSquare className="size-4 shrink-0 text-muted-foreground" />
         )}
@@ -525,6 +569,10 @@ function DraggableRecentConversationItem({
           }
         />
         <DropdownMenuContent align="end" side="right" sideOffset={4}>
+          <DropdownMenuItem onClick={() => onRename({ _id: conv._id, title: conv.title })}>
+            <Pencil className="size-4" />
+            <span>Rename</span>
+          </DropdownMenuItem>
           <DropdownMenuItem
             variant="destructive"
             onClick={async (e) => {
@@ -558,6 +606,7 @@ interface DroppableRecentsSectionProps {
   activeConv: DraggedConversationData | null
   currentPathname: string
   onDeleteConversation: (id: Id<"conversations">, isActive: boolean) => Promise<void>
+  onRenameConversation: (conv: RenameTarget) => void
 }
 
 function DroppableRecentsSection({
@@ -567,6 +616,7 @@ function DroppableRecentsSection({
   activeConv,
   currentPathname,
   onDeleteConversation,
+  onRenameConversation,
 }: DroppableRecentsSectionProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: "recents-drop-zone",
@@ -627,6 +677,7 @@ function DroppableRecentsSection({
                   conv={conv}
                   isActive={isActive}
                   onDelete={onDeleteConversation}
+                  onRename={onRenameConversation}
                 />
               )
             })
@@ -671,28 +722,29 @@ export function AppSidebar({
     currentUser._id ? { userId: currentUser._id } : "skip",
     { initialNumItems: RECENTS_PAGE_SIZE }
   )
+  // Projects are workspaces the legislator belongs to (alone or shared).
   const projectFolders = useQuery(
-    api.folders.listWithConversations,
+    api.workspaces.listForSidebar,
     currentUser._id ? { userId: currentUser._id } : "skip"
   )
   const removeConversation = useMutation(api.conversations.remove)
   const createConversation = useMutation(api.conversations.create)
-  const moveToFolder = useMutation(api.conversations.moveToFolder)
+  const moveToFolder = useMutation(api.conversations.moveToWorkspace)
   const togglePin = useMutation(api.conversations.togglePin)
-  const createFolder = useMutation(api.folders.create)
-  const removeFolder = useMutation(api.folders.remove)
-  const renameFolder = useMutation(api.folders.rename)
-  // Folder open/closed state is saved on the folder itself. The optimistic
-  // update flips it in the loaded folder list right away, so the toggle feels
-  // instant while the save happens in the background.
-  const setFolderOpenMutation = useMutation(api.folders.setOpen).withOptimisticUpdate(
-    (localStore, { id, open }) => {
-      for (const { args, value } of localStore.getAllQueries(api.folders.listWithConversations)) {
+  const createFolder = useMutation(api.workspaces.create)
+  const removeFolder = useMutation(api.workspaces.remove)
+  const renameFolder = useMutation(api.workspaces.rename)
+  // Each member's open/closed state is saved on their membership. The
+  // optimistic update flips it in the loaded list right away, so the toggle
+  // feels instant while the save happens in the background.
+  const setFolderOpenMutation = useMutation(api.workspaces.setOpen).withOptimisticUpdate(
+    (localStore, { workspaceId, open }) => {
+      for (const { args, value } of localStore.getAllQueries(api.workspaces.listForSidebar)) {
         if (!value) continue
         localStore.setQuery(
-          api.folders.listWithConversations,
+          api.workspaces.listForSidebar,
           args,
-          value.map((folder) => (folder._id === id ? { ...folder, defaultOpen: open } : folder))
+          value.map((w) => (w._id === workspaceId ? { ...w, isOpen: open } : w))
         )
       }
     }
@@ -707,8 +759,9 @@ export function AppSidebar({
   const [isCreatingFolder, setIsCreatingFolder] = React.useState(false)
 
   // Dialog state for renaming a project folder
-  const [renamingFolder, setRenamingFolder] = React.useState<{ id: Id<"folders">; name: string } | null>(null)
+  const [renamingFolder, setRenamingFolder] = React.useState<{ id: Id<"workspaces">; name: string } | null>(null)
   const [renameFolderName, setRenameFolderName] = React.useState("")
+  const [renamingConversation, setRenamingConversation] = React.useState<RenameTarget | null>(null)
   const [isRenamingFolder, setIsRenamingFolder] = React.useState(false)
 
   // Drag and Drop active item state
@@ -723,12 +776,13 @@ export function AppSidebar({
   )
 
   const setFolderOpen = React.useCallback(
-    (folderId: Id<"folders">, open: boolean) => {
-      setFolderOpenMutation({ id: folderId, open }).catch((err) => {
-        console.error("Failed to save folder state", err)
+    (folderId: Id<"workspaces">, open: boolean) => {
+      if (!currentUser._id) return
+      setFolderOpenMutation({ workspaceId: folderId, userId: currentUser._id, open }).catch((err) => {
+        console.error("Failed to save project state", err)
       })
     },
-    [setFolderOpenMutation]
+    [setFolderOpenMutation, currentUser._id]
   )
 
   const [userMenuOpen, setUserMenuOpen] = React.useState(false)
@@ -800,11 +854,11 @@ export function AppSidebar({
 
     // Dropped onto a folder
     if (overId.startsWith("folder-")) {
-      const targetFolderId = over.data.current?.folderId as Id<"folders"> | undefined
+      const targetFolderId = over.data.current?.folderId as Id<"workspaces"> | undefined
       if (targetFolderId && targetFolderId !== activeData.currentFolderId) {
         await moveToFolder({
           id: activeData.conversationId,
-          folderId: targetFolderId,
+          workspaceId: targetFolderId,
         })
         // Ensure destination folder is open so the user sees the newly moved item
         setFolderOpen(targetFolderId, true)
@@ -817,7 +871,7 @@ export function AppSidebar({
       if (activeData.currentFolderId !== undefined) {
         await moveToFolder({
           id: activeData.conversationId,
-          folderId: undefined,
+          workspaceId: undefined,
         })
       }
       return
@@ -843,9 +897,9 @@ export function AppSidebar({
     }
   }
 
-  const handleNavigateToNewWithFolder = (folderId: Id<"folders">) => {
+  const handleNavigateToNewWithFolder = (folderId: Id<"workspaces">) => {
     setFolderOpen(folderId, true)
-    router.push(`/new?folderId=${folderId}`)
+    router.push(`/new?workspaceId=${folderId}`)
   }
 
   return (
@@ -921,10 +975,10 @@ export function AppSidebar({
                       setCreateFolderOpen(true)
                     }}
                     className="size-7 text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
-                    title="Create new folder"
+                    title="Create new project"
                   >
                     <Plus className="size-4" />
-                    <span className="sr-only">Create folder</span>
+                    <span className="sr-only">Create project</span>
                   </Button>
                 </div>
               </div>
@@ -946,7 +1000,7 @@ export function AppSidebar({
                       <DroppableFolderItem
                         key={folder._id}
                         folder={folder}
-                        isOpen={folder.defaultOpen ?? true}
+                        isOpen={folder.isOpen}
                         onOpenChange={(open) => setFolderOpen(folder._id, open)}
                         activeConv={activeConv}
                         currentPathname={pathname}
@@ -962,6 +1016,7 @@ export function AppSidebar({
                           await togglePin({ id })
                         }}
                         onDeleteConversation={handleDeleteConversation}
+                        onRenameConversation={setRenamingConversation}
                       />
                     ))
                   )}
@@ -977,6 +1032,7 @@ export function AppSidebar({
               activeConv={activeConv}
               currentPathname={pathname}
               onDeleteConversation={handleDeleteConversation}
+              onRenameConversation={setRenamingConversation}
             />
 
             {/* Drag Overlay: Snappy, lightweight physics preview adhering to Emil Kowalski guidelines */}
@@ -1244,9 +1300,9 @@ export function AppSidebar({
       <Dialog open={createFolderOpen} onOpenChange={setCreateFolderOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>New Project Folder</DialogTitle>
+            <DialogTitle>New Project</DialogTitle>
             <DialogDescription>
-              Create a new folder to organize related conversations and legislative initiatives.
+              A project holds related conversations and a discussion. You can add other legislators from the project page.
             </DialogDescription>
           </DialogHeader>
           <form
@@ -1257,14 +1313,15 @@ export function AppSidebar({
               setIsCreatingFolder(true)
               try {
                 // New folders are created open (folders.create defaults to open).
+                if (!currentUser._id) return
                 await createFolder({
                   name: trimmed,
-                  userId: currentUser._id,
+                  createdBy: currentUser._id,
                 })
                 setNewFolderName("")
                 setCreateFolderOpen(false)
               } catch (err) {
-                console.error("Failed to create folder", err)
+                console.error("Failed to create project", err)
               } finally {
                 setIsCreatingFolder(false)
               }
@@ -1273,7 +1330,7 @@ export function AppSidebar({
           >
             <FieldGroup>
               <Field>
-                <FieldLabel htmlFor="new-project-folder-name">Folder Name</FieldLabel>
+                <FieldLabel htmlFor="new-project-folder-name">Project name</FieldLabel>
                 <Input
                   id="new-project-folder-name"
                   placeholder="e.g. Housing & Infrastructure"
@@ -1297,12 +1354,17 @@ export function AppSidebar({
                 type="submit"
                 disabled={!newFolderName.trim() || isCreatingFolder}
               >
-                Create Folder
+                Create Project
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
+
+      <RenameConversationDialog
+        conversation={renamingConversation}
+        onOpenChange={(open) => !open && setRenamingConversation(null)}
+      />
 
       {/* Dialog to rename a project folder */}
       <Dialog
@@ -1318,7 +1380,7 @@ export function AppSidebar({
           <DialogHeader>
             <DialogTitle>Rename Folder</DialogTitle>
             <DialogDescription>
-              Enter a new name for this project folder.
+              Enter a new name for this project.
             </DialogDescription>
           </DialogHeader>
           <form
@@ -1333,7 +1395,7 @@ export function AppSidebar({
                 setRenamingFolder(null)
                 setRenameFolderName("")
               } catch (err) {
-                console.error("Failed to rename folder", err)
+                console.error("Failed to rename project", err)
               } finally {
                 setIsRenamingFolder(false)
               }
@@ -1342,7 +1404,7 @@ export function AppSidebar({
           >
             <FieldGroup>
               <Field>
-                <FieldLabel htmlFor="rename-project-folder-name">Folder Name</FieldLabel>
+                <FieldLabel htmlFor="rename-project-folder-name">Project name</FieldLabel>
                 <Input
                   id="rename-project-folder-name"
                   placeholder="e.g. Housing & Infrastructure"
