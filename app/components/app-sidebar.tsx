@@ -220,10 +220,12 @@ function DraggableFolderConversationItem({
         isActive={isActive}
         className="h-8 pr-16"
       >
+        {/* `!` because SidebarMenuSubButton forces its icons to the accent colour;
+            these match the icons in Recents instead. */}
         {conv.thinking ? (
-          <Loader2 className="size-4 shrink-0 text-primary animate-spin" />
+          <Loader2 className="size-4 shrink-0 text-primary! animate-spin" />
         ) : (
-          <MessageSquare className="size-4 shrink-0 text-muted-foreground" />
+          <MessageSquare className="size-4 shrink-0 text-muted-foreground!" />
         )}
         <span className="truncate">{conv.title}</span>
       </SidebarMenuSubButton>
@@ -360,7 +362,7 @@ function DroppableFolderItem({
                 className="h-8 pr-16"
               >
                 <Folder className="size-4 group-data-open/collapsible:hidden text-muted-foreground" />
-                <FolderOpen className="size-4 hidden group-data-open/collapsible:block text-primary" />
+                <FolderOpen className="size-4 hidden group-data-open/collapsible:block text-muted-foreground" />
                 <span className="truncate">{folder.name}</span>
               </SidebarMenuButton>
             }
