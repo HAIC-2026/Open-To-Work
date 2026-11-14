@@ -3,12 +3,8 @@
 import * as React from "react"
 import {
   ArrowUpIcon,
-  PlusIcon,
   Map,
   ChevronDown,
-  PaperclipIcon,
-  TelescopeIcon,
-  GlobeIcon,
   Folder,
   Check,
   Square,
@@ -146,7 +142,6 @@ export function PromptInput({
     }),
     []
   )
-  const inputRef = React.useRef<HTMLInputElement>(null)
 
   const isBlocked = disabled || isLoading
   const canSend = text.trim().length > 0 && !isBlocked
@@ -178,48 +173,8 @@ export function PromptInput({
           className="p-3 text-base md:text-base leading-relaxed max-h-48 overflow-y-auto disabled:opacity-50 disabled:cursor-not-allowed"
         />
 
-        <InputGroupAddon align="block-end" className="flex items-center justify-between">
-          {/* Left: Add Context / File attachment DropdownMenu */}
-          <div className="flex items-center">
-            <input
-              type="file"
-              ref={inputRef}
-              className="hidden"
-              multiple
-            />
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <InputGroupButton
-                    size="icon-sm"
-                    variant="outline"
-                    className="rounded-full"
-                    aria-label="Add context"
-                    type="button"
-                  />
-                }
-              >
-                <PlusIcon />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" side="top" className="w-48">
-                <DropdownMenuItem onClick={() => inputRef.current?.click()}>
-                  <PaperclipIcon />
-                  <span>Add Photos & Files</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <TelescopeIcon />
-                  <span>Deep Research</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <GlobeIcon />
-                  <span>Web Search</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-
-          {/* Right: Pair of buttons (District Dropdown + District Map) and Send Button */}
+        <InputGroupAddon align="block-end" className="flex items-center justify-end">
+          {/* Folder, district and map buttons, then the send button */}
           <div className="flex items-center gap-2">
             {/* The pair of buttons */}
             <div className="flex items-center gap-1.5">

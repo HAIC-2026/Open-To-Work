@@ -6,7 +6,6 @@ import { usePathname, useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import {
   Plus,
-  Bot,
   Users,
   MoreVertical,
   Pin,
@@ -772,11 +771,6 @@ export function AppSidebar({
       icon: Plus,
     },
     {
-      title: "Your assistants",
-      url: "/assistants",
-      icon: Bot,
-    },
-    {
       title: "Collaborate",
       url: "/collaborate",
       icon: Users,
@@ -881,7 +875,7 @@ export function AppSidebar({
 
         {/* Sidebar Content */}
         <SidebarContent>
-          {/* Main top tabs: New, Your assistants, Collaborate */}
+          {/* Main top tabs: New, Collaborate */}
           <SidebarGroup>
             <SidebarGroupContent>
               <SidebarMenu>
