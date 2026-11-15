@@ -15,7 +15,18 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { MarkdownRenderer } from "@/components/markdown-renderer"
 import { AgentTrace } from "@/components/agent-trace"
-import { Sources, extractCitations } from "@/components/sources"
+import { Sources, extractCitations, extractSources } from "@/components/sources"
+import { saveReport, type ReportPayload } from "@/lib/report-store"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import {
   MessageScrollerProvider,
   MessageScroller,
@@ -51,6 +62,7 @@ import {
   CheckIcon,
   PencilIcon,
   RotateCcw,
+  FileDown,
 } from "lucide-react"
 
 function MessageAction({
@@ -287,6 +299,9 @@ export default function ConversationPage({
   // resubmit mutation deletes the old answer (and its tool steps), resets the
   // Python sandbox and schedules a fresh response; the title is kept.
   const lastQuestion = [...messages].reverse().find((m) => m.role === "user")
+
+  // Answer chosen for "Download PDF", waiting for confirmation in the dialog.
+  const [exportTarget, setExportTarget] = React.useState<Omit<ReportPayload, "exportedAt"> | null>(null)
   const handleRegenerate = async () => {
     if (!lastQuestion || isResubmitting || isThinking || !conversation) return
     try {
@@ -581,6 +596,30 @@ export default function ConversationPage({
                                       <RotateCcw className="size-4" />
                                     </MessageAction>
                                   )}
+                                  {Boolean(message.content) && !isMessageThinking && (
+                                    <MessageAction
+                                      label="Download PDF"
+                                      onClick={() => {
+                                        // The question this answer responds to: the nearest user message before it.
+                                        const question = messages
+                                          .slice(0, index)
+                                          .reverse()
+                                          .find((m) => m.role === "user")?.content
+                                        const parts = "parts" in message ? message.parts : undefined
+                                        setExportTarget({
+                                          conversationTitle: conversation.title,
+                                          district: conversation.district,
+                                          question,
+                                          answer: message.content,
+                                          citations: extractCitations(parts),
+                                          sources: extractSources(parts, message.content),
+                                          answeredAt: "_creationTime" in message ? message._creationTime : undefined,
+                                        })
+                                      }}
+                                    >
+                                      <FileDown className="size-4" />
+                                    </MessageAction>
+                                  )}
                                 </MessageFooter>
                               )}
                               {/* Follow-up suggestions (shadcn AI Elements "Suggestion"), only under the
@@ -635,6 +674,32 @@ export default function ConversationPage({
             </div>
           </div>
         </div>
+        {/* Confirm before exporting an answer as a PDF report (opens /report/... in a new tab). */}
+        <AlertDialog open={exportTarget !== null} onOpenChange={(open) => !open && setExportTarget(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Download this answer as a PDF?</AlertDialogTitle>
+              <AlertDialogDescription>
+                A report with the question, the answer and its sources opens in a new tab. In the print window,
+                choose Save as PDF.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (!exportTarget) return
+                  const key = saveReport({ ...exportTarget, exportedAt: Date.now() })
+                  window.open(`/report/${key}`, "_blank")
+                  setExportTarget(null)
+                }}
+              >
+                <FileDown data-icon="inline-start" />
+                Create PDF
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </MessageScrollerProvider>
   )
 }

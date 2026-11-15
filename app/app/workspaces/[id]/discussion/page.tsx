@@ -322,7 +322,7 @@ export default function WorkspaceDiscussionPage() {
                 className="w-full"
                 label="Send message"
                 mentionables={mentionables}
-                placeholder={isMember ? "Write a message to the group..." : "Only members can post"}
+                placeholder={isMember ? "Write a message to the group, or type @ to mention a conversation..." : "Only members can post"}
                 disabled={!isMember}
                 onSend={async (body) => {
                   if (!me._id) return

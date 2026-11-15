@@ -25,6 +25,7 @@ import {
   type Island,
 } from "@/lib/district-map"
 import { useLiveData } from "./explore-districts-drawer"
+import { useReportMode } from "@/components/report-mode"
 import { GROUP_FILLS, type MapBlockDistrict } from "./map-block-types"
 
 // Leaflet needs `window`, so load the map on the client only (Next.js
@@ -136,6 +137,7 @@ export function DistrictMapBlock({ source, isStreaming }: DistrictMapBlockProps)
 
 function MapCard({ spec }: { spec: MapSpec }) {
   const askAbout = React.useContext(MapAskContext)
+  const inReport = useReportMode()
   const chamberLabel = CHAMBERS[spec.chamber].label
   const shapesState = useLiveData<DistrictShapes>(`map-block-shapes:${spec.chamber}`, () =>
     loadDistrictShapes(spec.chamber)
@@ -241,8 +243,12 @@ function MapCard({ spec }: { spec: MapSpec }) {
   }, [spec, highlights, islandOf])
 
   const [pickedView, setPickedView] = React.useState<Island | "all" | null>(null)
+  // In PDF reports there is no island switcher, so a map with districts on
+  // several islands shows all of them.
   const defaultView: Island | "all" =
-    spec.island ?? (islands.length === 1 ? islands[0].island : spec.home !== undefined ? (islandOf(spec.home) ?? "all") : "all")
+    inReport && islands.length > 1
+      ? "all"
+      : (spec.island ?? (islands.length === 1 ? islands[0].island : spec.home !== undefined ? (islandOf(spec.home) ?? "all") : "all"))
   const view = pickedView ?? defaultView
 
   const visibleShapes = React.useMemo((): DistrictShapes | null => {
@@ -263,7 +269,8 @@ function MapCard({ spec }: { spec: MapSpec }) {
   const listed = highlights
 
   return (
-    <Card size="sm" className="my-4 w-full">
+    // data-district-map lets the PDF report wait until every map has drawn before printing.
+    <Card size="sm" className="my-4 w-full" data-district-map="">
       <CardHeader>
         <CardTitle>{spec.title}</CardTitle>
         <CardDescription>
@@ -273,7 +280,8 @@ function MapCard({ spec }: { spec: MapSpec }) {
       </CardHeader>
 
       <CardContent className="flex flex-col gap-3">
-        {islands.length > 1 && (
+        {/* No island switcher in PDF reports: the map prints in its starting view. */}
+        {islands.length > 1 && !inReport && (
           <ToggleGroup
             variant="outline"
             size="sm"

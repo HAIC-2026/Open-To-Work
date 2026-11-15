@@ -15,6 +15,7 @@ import { Spinner } from "@/components/ui/spinner"
 import { StartWorkspaceDialog, WorkspaceStartContext } from "@/components/workspaces/start-workspace-dialog"
 import { MemberAvatar } from "@/components/workspaces/workspace-ui"
 import { formatDistrictTitle } from "@/lib/legislators"
+import { useReportMode } from "@/components/report-mode"
 
 /**
  * What the agent writes inside a ```project-invite fenced block (see the
@@ -40,11 +41,52 @@ function parseInvite(source: string): InviteSpec | null {
 
 export function ProjectInviteBlock({ source, isStreaming }: { source: string; isStreaming?: boolean }) {
   const spec = React.useMemo(() => parseInvite(source), [source])
+  const inReport = useReportMode()
   if (!spec) {
     // Still being written: hold its place. A finished but invalid block shows nothing.
     return isStreaming ? <Skeleton className="h-40 w-full rounded-2xl" /> : null
   }
-  return <InviteCard spec={spec} />
+  // PDF reports get a static list of the partners instead of the buttons.
+  return inReport ? <PartnerSummary spec={spec} /> : <InviteCard spec={spec} />
+}
+
+/** Print version of the invite: who the suggested partners are, without actions. */
+function PartnerSummary({ spec }: { spec: InviteSpec }) {
+  const users = useQuery(api.users.list)
+  if (users === undefined) return <Skeleton className="h-24 w-full rounded-2xl" />
+  const legislators = [...new Set(spec.districts)]
+    .map((n) => users.find((u) => u.district === `${spec.chamber}-district-${n}`))
+    .filter((u): u is NonNullable<typeof u> => Boolean(u))
+  if (legislators.length === 0) return null
+
+  return (
+    <Card size="sm" className="my-2 break-inside-avoid">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <UsersRound className="size-4 text-muted-foreground" />
+          Possible partners
+        </CardTitle>
+        <CardDescription>
+          {spec.focus || `Suggested for a shared project: “${spec.name}”.`}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ItemGroup className="flex-row flex-wrap gap-2">
+          {legislators.map((u) => (
+            <Item key={u._id} role="listitem" variant="muted" size="xs" className="w-auto">
+              <ItemMedia>
+                <MemberAvatar member={u} size="sm" />
+              </ItemMedia>
+              <ItemContent className="gap-0">
+                <ItemTitle>{u.name}</ItemTitle>
+                <ItemDescription>{formatDistrictTitle(u.district)}</ItemDescription>
+              </ItemContent>
+            </Item>
+          ))}
+        </ItemGroup>
+      </CardContent>
+    </Card>
+  )
 }
 
 function InviteCard({ spec }: { spec: InviteSpec }) {
