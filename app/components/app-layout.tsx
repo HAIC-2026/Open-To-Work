@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { usePathname } from "next/navigation"
 import {
   SidebarInset,
   SidebarProvider,
@@ -40,6 +41,9 @@ function AppLayoutContent({ children, sidebarProps, className, containerClassNam
 }
 
 export function AppLayout(props: AppLayoutProps) {
+  // Printable reports (/report/...) render on their own page, without the sidebar.
+  const pathname = usePathname()
+  if (pathname?.startsWith("/report/")) return <>{props.children}</>
   return (
     <SidebarResizeProvider>
       <AppLayoutContent {...props} />
