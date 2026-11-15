@@ -21,7 +21,7 @@ const RESEARCH_PRESETS: ChatStartPreset[] = [
     label: "District Profile",
     icon: Building2,
     prompt:
-      "Give me a demographic and economic profile of my district: population, age, income, housing, and employment, compared to the state.",
+      "Give me a demographic and economic profile of my district: population, age, income, housing, and employment. Then add a section comparing my district with its county and with the state of Hawaiʻi on those same measures.",
   },
   {
     id: "poverty-rates",
