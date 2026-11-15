@@ -68,6 +68,13 @@ const COLLABORATE_PRESETS: ChatStartPreset[] = [
 type Mode = "district" | "collaborate"
 
 /**
+ * Mode tabs: larger than default; the active one filled with the primary color
+ * (light and dark), keeping its text color on hover (the tab's default hover darkens text).
+ */
+const MODE_TAB_CLASS =
+  "gap-2 px-5 text-base data-active:bg-primary data-active:text-primary-foreground data-active:hover:text-primary-foreground dark:data-active:border-transparent dark:data-active:bg-primary dark:data-active:text-primary-foreground!"
+
+/**
  * New conversation, in one of two modes picked with the tabs at the top:
  * Research (questions about the district) or Collaborate (programs and
  * partner districts). The mode lives in the URL (?mode=collaborate), so links
@@ -103,13 +110,14 @@ function NewConversation() {
     >
       {/* Mode switcher near the top; each mode's start screen stays centered below. */}
       <div className="absolute inset-x-0 top-6 z-20 flex justify-center md:top-8">
-        {/* Larger than the default tabs (h-8, text-sm) so the mode switch stands out. */}
+        {/* Larger than the default tabs (h-8, text-sm) so the mode switch stands out;
+            the active mode is filled with the primary color. */}
         <TabsList className="p-1 group-data-horizontal/tabs:h-11">
-          <TabsTrigger value="district" className="gap-2 px-5 text-base">
+          <TabsTrigger value="district" className={MODE_TAB_CLASS}>
             <Search className="size-5" />
             Research
           </TabsTrigger>
-          <TabsTrigger value="collaborate" className="gap-2 px-5 text-base">
+          <TabsTrigger value="collaborate" className={MODE_TAB_CLASS}>
             <Users className="size-5" />
             Collaborate
           </TabsTrigger>
