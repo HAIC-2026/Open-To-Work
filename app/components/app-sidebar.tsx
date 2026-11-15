@@ -942,7 +942,9 @@ export function AppSidebar({
                         className="justify-center bg-primary font-medium text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground data-active:bg-primary data-active:text-primary-foreground"
                       >
                         <Icon className="size-4" />
-                        <span>{item.title}</span>
+                        {/* Hidden when collapsed: the centered icon would otherwise shift
+                            to make room for the (clipped) label and the gap before it. */}
+                        <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   )
