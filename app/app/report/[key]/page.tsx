@@ -8,6 +8,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/u
 import { MarkdownRenderer } from "@/components/markdown-renderer"
 import { describeCitation, type SourceItem } from "@/components/sources"
 import { loadReport, type ReportPayload } from "@/lib/report-store"
+import { ReportModeContext } from "@/components/report-mode"
 
 /**
  * Printable report for one answer. Opened in a new tab by the conversation
@@ -15,6 +16,26 @@ import { loadReport, type ReportPayload } from "@/lib/report-store"
  * browser's print dialog, where "Save as PDF" writes the file (named after the
  * document title). Rendered outside the app shell (see AppLayout).
  */
+
+/**
+ * Resolve once every district map in the report has drawn its shapes (Leaflet
+ * paths inside each [data-district-map] card), or after `timeoutMs`, so the
+ * print dialog never captures a blank map.
+ */
+function waitForMaps(timeoutMs = 10_000): Promise<void> {
+  const ready = () =>
+    Array.from(document.querySelectorAll(".mohala-report [data-district-map]")).every((card) =>
+      card.querySelector(".leaflet-overlay-pane path")
+    )
+  return new Promise((resolve) => {
+    const started = Date.now()
+    const check = () => {
+      if (ready() || Date.now() - started > timeoutMs) resolve()
+      else window.setTimeout(check, 200)
+    }
+    check()
+  })
+}
 
 // Paper setup and a fixed light palette, so the PDF looks the same even when
 // the app is in dark mode. Page numbers use @page margin boxes where supported.
@@ -44,6 +65,8 @@ const PRINT_STYLES = `
   --border: oklch(0.888 0.019 155.8);
   --input: oklch(0.888 0.019 155.8);
 }
+/* Maps print as figures: no zoom buttons or attribution badge. */
+.mohala-report .leaflet-control-container { display: none !important; }
 @media print {
   html, body { background: #fff !important; height: auto !important; overflow: visible !important; }
   .mohala-report { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -98,10 +121,14 @@ function Report() {
     document.title = `${payload.conversationTitle} · Mohala`
     if (preview) return
     let cancelled = false
+    // Give the answer a moment to mount, then wait for fonts and maps.
     const timer = window.setTimeout(async () => {
       await document.fonts?.ready
+      await waitForMaps()
+      // One more beat so Leaflet finishes laying out labels after the shapes appear.
+      await new Promise((r) => window.setTimeout(r, 400))
       if (!cancelled) window.print()
-    }, 1500)
+    }, 800)
     return () => {
       cancelled = true
       window.clearTimeout(timer)
@@ -128,6 +155,7 @@ function Report() {
   const exportedOn = formatDate(payload.exportedAt)
 
   return (
+    <ReportModeContext.Provider value={true}>
     <div className="mohala-report min-h-svh bg-muted py-10 text-foreground print:bg-white print:py-0">
       <style>{PRINT_STYLES}</style>
 
@@ -216,5 +244,6 @@ function Report() {
         </footer>
       </article>
     </div>
+    </ReportModeContext.Provider>
   )
 }
