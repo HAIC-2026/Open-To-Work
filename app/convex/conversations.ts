@@ -20,6 +20,7 @@ const conversationValidator = v.object({
   mode: v.optional(v.union(v.literal("district"), v.literal("collaborate"))),
   workspaceId: v.optional(v.id("workspaces")),
   suggestions: v.optional(v.array(v.string())),
+  lastError: v.optional(v.string()),
 })
 
 /**
@@ -75,6 +76,7 @@ export const get = query({
       mode: v.optional(v.union(v.literal("district"), v.literal("collaborate"))),
       workspaceId: v.optional(v.id("workspaces")),
       suggestions: v.optional(v.array(v.string())),
+      lastError: v.optional(v.string()),
     })
   ),
   handler: async (ctx, args) => {
@@ -250,12 +252,17 @@ export const setThinking = internalMutation({
   args: {
     conversationId: v.id("conversations"),
     thinking: v.boolean(),
+    /** When the answer failed: a short reason shown to the user. */
+    error: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     const conv = await ctx.db.get(args.conversationId)
     if (conv) {
-      await ctx.db.patch(args.conversationId, { thinking: args.thinking })
+      await ctx.db.patch(args.conversationId, {
+        thinking: args.thinking,
+        ...(args.error ? { lastError: args.error } : {}),
+      })
     }
     return null
   },

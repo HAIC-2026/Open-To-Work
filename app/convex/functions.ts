@@ -31,19 +31,20 @@ triggers.register("conversations", async (ctx, change) => {
 // Follow-up suggestions. `thinking` turning off means an answer finished
 // (conversations.setThinking, from the agent action): schedule the job that
 // suggests next questions. Turning on means a new question was sent: clear the
-// old suggestions (innerDb so this write doesn't run triggers again). Pressing
-// Stop (chat.stopThinking) uses the raw builder, so a stopped answer gets none.
+// old suggestions and any error from the last answer (innerDb so this write
+// doesn't run triggers again). Pressing Stop (chat.stopThinking) uses the raw
+// builder, so a stopped answer gets none, and neither does a failed one.
 triggers.register("conversations", async (ctx, change) => {
   if (change.operation !== "update") return
   const wasThinking = change.oldDoc.thinking === true
   const isThinking = change.newDoc.thinking === true
-  if (wasThinking && !isThinking && change.newDoc.threadId) {
+  if (wasThinking && !isThinking && change.newDoc.threadId && !change.newDoc.lastError) {
     await ctx.scheduler.runAfter(0, internal.suggestions.generate, {
       conversationId: change.id,
       threadId: change.newDoc.threadId,
     })
-  } else if (!wasThinking && isThinking && change.newDoc.suggestions?.length) {
-    await ctx.innerDb.patch(change.id, { suggestions: undefined })
+  } else if (!wasThinking && isThinking && (change.newDoc.suggestions?.length || change.newDoc.lastError)) {
+    await ctx.innerDb.patch(change.id, { suggestions: undefined, lastError: undefined })
   }
 })
 

@@ -561,9 +561,15 @@ export default function ConversationPage({
                                   <span>Formulating response...</span>
                                 </div>
                               ) : !isThinking && (message.status === "failed" || !message.content) ? (
-                                <div className="text-xs text-muted-foreground italic py-1">
-                                  Thinking process halted.
-                                </div>
+                                isLastAssistantMessage && conversation?.lastError ? (
+                                  <p role="alert" className="py-1 text-sm text-destructive">
+                                    {conversation.lastError}
+                                  </p>
+                                ) : (
+                                  <div className="text-xs text-muted-foreground italic py-1">
+                                    Thinking process halted.
+                                  </div>
+                                )
                               ) : null}
                               {/* Real-time Sources Trace (shadcn/ui AI Elements) */}
                               {Boolean(message.content) && (

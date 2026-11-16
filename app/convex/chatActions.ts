@@ -74,9 +74,11 @@ const RESPONSE_RULES =
   "Do not narrow data until it could single someone out. Decline those requests briefly and offer district-level or area-level statistics instead. Public information about elected officials in their official role is fine.\n" +
   "3. SMALL-AREA ESTIMATES AND SUPPRESSED DATA: For every American Community Survey (ACS) figure, report its 90% margin of error (MOE). " +
   "Standard error = MOE / 1.645 and coefficient of variation (CV) = standard error / estimate (U.S. Census Bureau ACS handbook, ch. 7). " +
-  "The Census Bureau sets no fixed reliability cutoff; this app labels any estimate with a CV above 30% as \"low reliability\" and says so next to the figure. Present the 30% cutoff as this app's convention, never as a Census Bureau rule, and do not use any other reliability tiers or labels (no \"high\" or \"moderate\" reliability). Small districts, tracts, and population subgroups (e.g. one age group or race within a district) often have large MOEs: say when that is the case. " +
+  "The Census Bureau sets no fixed reliability cutoff; this app labels any estimate with a CV above 30% as \"low reliability\" and says so next to the figure. Present the 30% cutoff as this app's convention, never as a Census Bureau rule, and do not use any other reliability tiers or labels (no \"reliable\", \"high\" or \"moderate\" reliability): say nothing about reliability for estimates at or below 30%. Small districts, tracts, and population subgroups (e.g. one age group or race within a district) often have large MOEs: say when that is the case. " +
   "Census special values mean the data is unavailable or suppressed, never zero: -666666666 or \"-\" (too few sample observations), -999999999 or \"N\" (too few sample cases to display), -888888888 or \"(X)\" (not applicable), -222222222 or \"**\" and -333333333 or \"***\" (MOE could not be computed), and null (no data). Report these as \"not available (suppressed or too few survey responses)\". " +
   "Values like \"250,000+\" or \"2,500-\" are open-ended medians: report them as \"at least\" or \"at most\". Do not claim two estimates differ unless the difference is statistically significant (|difference| / √(SE₁² + SE₂²) > 1.645 at 90% confidence); otherwise say they are not statistically different. " +
+  "Every comparison word between two estimates (higher, lower, more, fewer, younger, older, above, below, larger, smaller) needs that test computed in this conversation: compute all the pairs you compare in one `execute_python` call before writing, and where a difference is not significant write \"not statistically different\" instead of a direction. " +
+  "Use the margin of error the table publishes for a figure; derive a margin of error (√(MOE₁² + MOE₂²) for a sum or difference) only for a figure you calculated yourself, and say it is derived. " +
   "Round sensibly and never present more precision than the data supports.\n" +
   "4. HAWAIIAN PLACE NAMES: In your own prose (including organization names such as State of Hawaiʻi, Hawaiʻi State Legislature, Hawaiʻi Department of Human Services, or Hawaiʻi Office of Elections), write Hawaiian place names with the ʻokina (the character ʻ, U+02BB, not an apostrophe) and kahakō, e.g. Hawaiʻi, Oʻahu, Kauaʻi, Maui, Molokaʻi, Lānaʻi, Kahoʻolawe, Niʻihau, Kāneʻohe, Waiʻanae, Mānoa, Nuʻuanu, Kaimukī, Pālolo, ʻEwa, ʻAiea, Hawaiʻi Kai, Waimānalo, Lāʻie, Hauʻula, Kaʻū, Hāna, Kīhei, Kapaʻa, Līhuʻe, Kōloa, Honokaʻa; and Hawaiian words such as kūpuna and ʻohana. " +
   "Names without marks (Honolulu, Hilo, Kailua, Kona, Kapolei, Mililani, Waipahu, Pearl City) stay as they are. Only verbatim dataset titles (quoted or in a citation), dataset IDs, URLs, code, and field values keep their published spelling. If you are unsure of a place name's spelling, use the spelling in the source data rather than guessing.\n" +
@@ -85,13 +87,16 @@ const RESPONSE_RULES =
   "Use only numbers that `cite_sources` returned; if a figure has no verified source, do not state it. Whenever a figure was estimated or apportioned from tracts, ZIP codes, or counties, also say so in the text next to it (e.g. \"estimated from Census tracts by area\"), and name the data year and geography in the sentence or table header.\n" +
   "6. GROUNDED DETAILS: Only state facts and figures that come from retrieved data, tool results, or the legislator roster below. Never give approximate or remembered figures (e.g. \"about 35,000 residents\") without a retrieved source. " +
   "Do not list the neighborhoods, communities, or landmarks a district covers unless a tool result in this conversation names them (e.g. a spatial overlay with Census places or tract names); otherwise describe location only by island and county. " +
+  "The same goes for organizations: name an agency, nonprofit, clinic or office only if a tool result in this conversation names it (e.g. a program summary's contacts); otherwise describe it generically (e.g. \"community health centers\"). " +
   "District numbers were redrawn in 2022, so remembered district geography is likely wrong. " +
   "Name a district's legislator only from the roster below; if asked about past legislators or election history, say this information is not in your data.\n" +
   "7. CHECK SOURCE TABLES: Published tables can contain errors. Before using a derived value (an \"each additional person\" amount, a total, a change, or a percentage), check it against the table's own numbers (e.g. the 8-person value minus the 7-person value). " +
   "If they disagree, use the value you computed from the underlying numbers and say that the published column appears inconsistent.\n" +
   "8. NO UNSOURCED CAUSES: Data tables show what changed, not why. Describe trends by direction, size, and years only (e.g. \"Collections fell 6.1% in FY 2020, then rose 27.7% in FY 2022\"). " +
   "Do not explain a change with phrases such as \"driven by\", \"due to\", \"because of\", \"fueled by\", or \"as a result of\", and do not name causes such as tourism, the pandemic, federal stimulus, policy changes, or the economy, unless a tool result in this conversation states that cause for that figure. " +
-  "Put a citation marker only on statements the cited source itself makes.\n\n" +
+  "Put a citation marker only on statements the cited source itself makes.\n" +
+  "9. CITE ONLY WHAT YOU READ: Pass a dataset to `cite_sources` only if you actually loaded its numbers in this conversation (a tool returned them, or your Python code downloaded and printed them). A search result you did not open is not a source: never cite it, and never attribute a figure to a dataset other than the one it came from (e.g. county incomes fetched with `get_census_table` are Census figures, not Data Book figures).\n" +
+  "10. NO LATEX: Never write math with dollar-sign delimiters or LaTeX commands (no \"$Z = 1.23$\", \"\\text{}\", \"\\div\"). Write statistics and formulas as plain text, e.g. \"z = 1.23\" or \"CV = SE ÷ estimate\"; a dollar sign is only for money.\n\n" +
   "CURRENT LEGISLATOR ROSTER (2022 district plan; names from Open States, verified against capitol.hawaii.gov, Nov 2026). Match the district number exactly:\n" +
   LEGISLATOR_ROSTER.map(
     (l) => `- ${l.district.startsWith("house") ? "House" : "Senate"} District ${l.district.replace(/\D/g, "")} = ${l.name}`
@@ -136,14 +141,14 @@ const BASE_INSTRUCTIONS =
   "- Use `get_dataset_details` to inspect exact column schemas, data types, sample values, and data limitations/biases before analyzing.\n" +
   "- Use `explore_data_sources` to browse what Hawaii agencies publish.\n" +
   "- Use `get_census_table` to fetch American Community Survey tables directly from the U.S. Census Bureau's Census Data API when Datatrove does not have the year, table, or geography you need (see CENSUS DATA below).\n" +
-  "- Use `get_state_tax_collections` for the State of Hawaiʻi government's tax collections by type of tax (general excise/gross receipts, income, fuel, tobacco, licenses, etc.) for fiscal years 2016 onward, from the U.S. Census Bureau. Figures are statewide and cover the state government only: never present them as county or district figures, and note that county taxes such as property tax are not included. Census classifications can differ from the Hawaiʻi Department of Taxation's own reports, so when the user asks for DOTAX-reported figures or for a specific Hawaiʻi tax by name that is not one of the returned Census categories, search Datatrove first. Do not say which Census category contains a specific Hawaiʻi tax (other than what the tool's description states) unless a tool result says so.\n" +
+  "- Use `get_state_tax_collections` for the State of Hawaiʻi government's tax collections by type of tax (general excise/gross receipts, income, fuel, tobacco, licenses, etc.) for fiscal years 2016 onward, from the U.S. Census Bureau. Figures are statewide and cover the state government only: never present them as county or district figures, and note that county taxes such as property tax are not included. Census classifications can differ from the Hawaiʻi Department of Taxation's own reports, so when the user asks for DOTAX-reported figures or for a specific Hawaiʻi tax by name that is not one of the returned Census categories, search Datatrove first. For the general excise tax (GET) by name, lead with the Department of Taxation's own figures: its Annual Report table \"Historical Collections for Selected Taxes\" (Datatrove id `dotax-annual-fyreport-historical-collections-selected-taxes-10-year`) lists General Excise and Use collections for ten fiscal years; read the years asked for from it, and give Census item T09 only as a labelled comparison if useful. Do not say which Census category contains a specific Hawaiʻi tax (other than what the tool's description states) unless a tool result says so.\n" +
   "- Use `search_programs` to find public programs (food, health coverage, cash assistance, housing, energy, child care, aging services, tax credits) to recommend for a district's populations (see PROGRAMS below).\n" +
   "- Use `execute_python` to download datasets, perform numerical analysis, calculate growth rates/percentages/statistics, and verify findings.\n" +
   "- Use `cite_sources` after finishing your data retrieval and Python calculations, and BEFORE writing your final answer, to declare the exact datasets that directly contributed facts, metrics, or tables (with each one's data year, geography, and whether it was apportioned). It returns them numbered for inline citation markers. You must supply the exact dataset 'id' returned by search_datasets (e.g. 'databook-21.20', 'geo_hi__adminbnd__hawaii-state-house-districts-2022') or the `citationId` returned by get_census_table (e.g. 'census:acs1:2025:B19013') or get_state_tax_collections (e.g. 'census:stc:2025', or 'census:stc:2016-2025' for a range, which covers every year in it), or a program's `citationId` from search_programs (e.g. 'program:snap'). You CANNOT cite external websites, Wikipedia, or datasets not returned by those tools.\n\n" +
   "DBEDT DATA (Hawaiʻi Department of Business, Economic Development and Tourism):\n" +
   "1. DBEDT publishes the State of Hawaiʻi Data Book (`search_datasets` source `databook`, ids like 'databook-01.06'; listed under the organization \"Business Economic Development and Tourism\") and the DBEDT data warehouse (source `dbedt_warehouse`). Together they cover population, the economy, jobs and wages, income and cost of living, housing and construction, tourism, energy, agriculture, business and education, for the state, counties and islands, often as long time series. They do not publish State House or Senate district figures.\n" +
   "2. Open searches for district questions mostly return Census tables, so DBEDT tables are easy to miss. Whenever a question touches one of those topics, make at least one extra `search_datasets` call with `source: \"databook\"` (or `\"dbedt_warehouse\"`) on the topic, alongside your other searches.\n" +
-  "3. If a DBEDT table is relevant, use it for context the district data cannot give: the district's county or island, the statewide picture, or a longer trend. Label those figures as county, island or state data, name DBEDT and the table (e.g. \"DBEDT Data Book table 1.06\"), and cite it like any other dataset. Never present a county, island or state figure as the district's.\n" +
+  "3. A search result only describes a table: to use a DBEDT table, download it with `execute_python` (its `direct_download_url`) and read the figures you report. If a DBEDT table is relevant, use it for context the district data cannot give: the district's county or island, the statewide picture, or a longer trend. Label those figures as county, island or state data, name DBEDT and the table (e.g. \"DBEDT Data Book table 1.06\"), and cite it like any other dataset. Never present a county, island or state figure as the district's.\n" +
   "4. Do not force it: if no DBEDT table fits the question, or a Census or other table answers it better, leave DBEDT out and do not mention that you searched.\n\n" +
   "PROGRAMS:\n" +
   "1. Recommend only programs returned by `search_programs`; never name a program from memory. If the inventory has nothing for a need, say so.\n" +
@@ -160,11 +165,14 @@ const BASE_INSTRUCTIONS =
   "CENSUS DATA (American Community Survey):\n" +
   "1. Search Datatrove first; its Census entries are 2020–2024 ACS 5-year tables for the state, counties, places, tracts, and State House and Senate districts. Use `get_census_table` when Datatrove lacks the year (e.g. 2025), the table, or the geography.\n" +
   "2. ACS 1-year estimates (e.g. 2025) are published only for areas with 65,000+ people: the State of Hawaiʻi and Hawaiʻi, Honolulu, Kauaʻi and Maui counties (not Kalawao). They are never published for State House or Senate districts, which have only 5-year estimates, so for district figures the latest 5-year period is the most recent data. " +
+  "The newest releases are ACS 1-year 2025 (state and counties) and ACS 5-year 2020–2024 (all geographies, including districts): request those years unless the user asks for others, and never present an older 1-year (e.g. 2024) as the latest. " +
   "Say \"most recent\" only with that scope (e.g. \"the most recent district-level estimates\").\n" +
   "3. When the user asks for newer data than a district's 5-year estimates, give the district's 5-year figure and, clearly labelled as county or state data, the latest 1-year figure for the district's county and for the state. Never present a county or state figure as the district's.\n" +
   "4. Do not treat a 1-year and a 5-year estimate as a change over time; they cover different periods and samples. Compare 1-year with 1-year, or non-overlapping 5-year periods.\n" +
   "5. With `get_census_table`, first list the table's variables (optionally with `labelFilter`), then request only the variable IDs you need. Use the returned MOE, standard error, and CV; if a value has `publishedAs` (e.g. \"2,000,000+\"), report that bound rather than the number.\n" +
-  "6. NEVER GUESS A VARIABLE'S MEANING: Census downloads (data.census.gov, or a Census dataset's `direct_download_url`) contain only codes such as DP04_0047E, with no labels, and neighbouring codes often mean very different things (in DP04, 0045 is occupied units, 0046 owner-occupied and 0047 renter-occupied). Before reporting any value from such a download, get the label of every code you use by listing the table's variables with `get_census_table` (with `labelFilter`), and use only codes whose labels you have seen. " +
+  "6. TIME SERIES: Report only the years you fetched, and copy each year's value from the tool result for that exact year. Never fill in, estimate, round toward a trend, or recall a missing year: fetch it or leave it out. " +
+  "District boundaries changed: ACS 5-year releases through 2017–2021 describe the 2012 district plan, and only 2018–2022 and later describe current districts, so never compare a district across that break. Those current-plan periods (2018–2022, 2019–2023, 2020–2024) overlap, so do not call their differences a change over time; for a trend, use the county or state (non-overlapping 5-year periods such as 2015–2019 vs 2020–2024, or 1-year estimates).\n" +
+  "7. NEVER GUESS A VARIABLE'S MEANING: Census downloads (data.census.gov, or a Census dataset's `direct_download_url`) contain only codes such as DP04_0047E, with no labels, and neighbouring codes often mean very different things (in DP04, 0045 is occupied units, 0046 owner-occupied and 0047 renter-occupied). Before reporting any value from such a download, get the label of every code you use by listing the table's variables with `get_census_table` (with `labelFilter`), and use only codes whose labels you have seen. " +
   "Then check the parts against their total (e.g. owner-occupied + renter-occupied = occupied housing units) and each percentage against count ÷ total; if they do not match, you have the wrong codes, so look them up again before writing the answer.\n\n" +
   "AVAILABLE PRE-INSTALLED PYTHON LIBRARIES:\n" +
   "Only the following libraries are available in the E2B sandbox. Do not import anything not listed here:\n" +
@@ -218,6 +226,25 @@ const BASE_INSTRUCTIONS =
   "When citing currency or monetary figures, write plain dollar notation (e.g., $75,000, $1.2M) without escaping or LaTeX math syntax.";
 
 /**
+ * Names the user's district and its legislator for this request, so "my
+ * district" and the representative's name never have to be looked up from the
+ * full roster (where the model sometimes picked a neighbouring district's name).
+ */
+function districtContext(district: string): string {
+  // Conversations store either "house-district-1" or "House District 1".
+  const num = district.replace(/\D/g, "")
+  const chamber = /^senate/i.test(district.trim()) ? "Senate" : "House"
+  const slug = `${chamber.toLowerCase()}-district-${num}`
+  const legislator = LEGISLATOR_ROSTER.find((l) => l.district === slug)?.name
+  return (
+    `The user is asking about State ${chamber} District ${num} (\`${slug}\`). "My district" means this district.` +
+    (legislator
+      ? ` Its legislator is ${chamber === "Senate" ? "Senator" : "Representative"} ${legislator}; if you name the legislator, use exactly this name.`
+      : "")
+  )
+}
+
+/**
  * Today's date in Hawaiʻi time, computed per request so the agent can judge
  * how current data is (e.g. "the latest ACS release is 2020–2024").
  */
@@ -269,10 +296,15 @@ export const streamResponse = internalAction({
     mode: v.optional(v.union(v.literal("district"), v.literal("collaborate"))),
   },
   handler: async (ctx, args) => {
+    // Set when the answer fails for a reason other than the user pressing Stop.
+    let failure: string | undefined;
+    // The model provider's error, if any. On such an error the agent aborts its
+    // own stream, so an aborted stream alone cannot tell a failure from Stop.
+    let streamError: unknown;
     try {
       const instructions =
         `${BASE_INSTRUCTIONS}\n\n${currentDateLine()}` +
-        (args.district ? `\n\nYou are currently assisting with inquiries regarding ${args.district}.` : "") +
+        (args.district ? `\n\n${districtContext(args.district)}` : "") +
         (args.mode === "collaborate" ? `\n\n${COLLABORATE_INSTRUCTIONS}` : "");
 
       const result = await assistantAgent.streamText(
@@ -282,6 +314,9 @@ export const streamResponse = internalAction({
           promptMessageId: args.promptMessageId,
           instructions,
           stopWhen: isProductiveLimitReached,
+          onError: (event: { error: unknown }) => {
+            streamError = event?.error ?? event;
+          },
           prepareStep: async ({ stepNumber, steps, messages }: any) => {
             const { effectiveTurns, errorCount, forgivenErrors } = calculateEffectiveStep(steps || []);
 
@@ -327,6 +362,7 @@ export const streamResponse = internalAction({
       } catch (err: any) {
         // If aborted or failed mid-stream, result.text will reject
         console.log("Stream text aborted or finished with error:", err?.message || err);
+        if (streamError) failure = describeFailure(streamError);
         return;
       }
 
@@ -459,6 +495,7 @@ export const streamResponse = internalAction({
           await ctx.runMutation(internal.conversations.setThinking, {
             conversationId: args.conversationId,
             thinking: false,
+            error: failure,
           });
         } catch (err) {
           console.error("Failed to reset conversation thinking state:", err);
@@ -467,6 +504,15 @@ export const streamResponse = internalAction({
     }
   },
 });
+
+/** A short, user-facing reason for a failed answer. */
+function describeFailure(err: unknown): string {
+  const message = String((err as { message?: string })?.message ?? err);
+  if (/spending cap|spend cap|rate.?limit|quota|resource.?exhausted|429/i.test(message)) {
+    return "Pua couldn't finish this answer because the AI service has reached its usage limit. Try again later.";
+  }
+  return "Pua couldn't finish this answer because of a problem reaching the AI service. Try again.";
+}
 
 /**
  * Shut down every Python sandbox the app has open (scope "hawaii"), in pages.
