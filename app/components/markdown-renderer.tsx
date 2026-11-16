@@ -32,6 +32,42 @@ interface MarkdownRendererProps {
   isStreaming?: boolean
 }
 
+/**
+ * The assistant is told to write statistics as plain text, but sometimes still
+ * writes inline LaTeX such as "$z = 1.97$" or "$\text{MOE} \div 1.645$". Single
+ * dollar signs are not math here (they are money), so those would show as raw
+ * markup. Rewrite them as plain text: only spans whose content starts with a
+ * letter or a backslash are touched, so "$1,989 ... $6,941" stays as money.
+ * Code blocks (maps, invites) are left alone.
+ */
+const LATEX_SYMBOLS: Record<string, string> = {
+  div: "÷", times: "×", cdot: "·", pm: "±", approx: "≈", le: "≤", leq: "≤", ge: "≥", geq: "≥",
+  neq: "≠", lt: "<", gt: ">", sigma: "σ", mu: "μ", alpha: "α", Delta: "Δ", percent: "%",
+}
+
+function latexToText(expr: string): string {
+  let s = expr
+  for (let i = 0; i < 3; i++) {
+    s = s
+      .replace(/\\frac\{([^{}]*)\}\{([^{}]*)\}/g, "($1) ÷ ($2)")
+      .replace(/\\sqrt\{([^{}]*)\}/g, "√($1)")
+      .replace(/\\(?:text|textbf|mathrm|mathbf|operatorname)\{([^{}]*)\}/g, "$1")
+  }
+  return s
+    .replace(/\\%/g, "%")
+    .replace(/\\([A-Za-z]+)/g, (m, name: string) => LATEX_SYMBOLS[name] ?? m)
+    .replace(/[{}]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+function plainInlineMath(markdown: string): string {
+  return markdown
+    .split(/(```[\s\S]*?(?:```|$))/)
+    .map((part, i) => (i % 2 === 1 ? part : part.replace(/\$(?=[A-Za-z\\])([^$\n]{1,120}?)\$/g, (_, expr: string) => latexToText(expr))))
+    .join("")
+}
+
 export function MarkdownRenderer({
   content,
   className,
@@ -39,6 +75,7 @@ export function MarkdownRenderer({
   citations = [],
   isStreaming = false,
 }: MarkdownRendererProps) {
+  const text = React.useMemo(() => plainInlineMath(content), [content])
   return (
     <div className={cn("text-sm md:text-base leading-relaxed text-foreground", className)}>
       <ReactMarkdown
@@ -177,7 +214,7 @@ export function MarkdownRenderer({
           },
         }}
       >
-        {content}
+        {text}
       </ReactMarkdown>
       {children}
     </div>

@@ -25,6 +25,11 @@ export default defineSchema({
     workspaceId: v.optional(v.id("workspaces")),
     /** Follow-up questions suggested after the latest answer (cleared when a new question is sent). */
     suggestions: v.optional(v.array(v.string())),
+    /**
+     * Why the latest answer could not be finished (e.g. the AI service's usage
+     * limit), shown under the question; cleared when a new question is sent.
+     */
+    lastError: v.optional(v.string()),
   })
     .index("by_user_workspace", ["userId", "workspaceId"])
     .index("by_workspace", ["workspaceId"]),
