@@ -163,7 +163,9 @@ const BASE_INSTRUCTIONS =
   "Say \"most recent\" only with that scope (e.g. \"the most recent district-level estimates\").\n" +
   "3. When the user asks for newer data than a district's 5-year estimates, give the district's 5-year figure and, clearly labelled as county or state data, the latest 1-year figure for the district's county and for the state. Never present a county or state figure as the district's.\n" +
   "4. Do not treat a 1-year and a 5-year estimate as a change over time; they cover different periods and samples. Compare 1-year with 1-year, or non-overlapping 5-year periods.\n" +
-  "5. With `get_census_table`, first list the table's variables (optionally with `labelFilter`), then request only the variable IDs you need. Use the returned MOE, standard error, and CV; if a value has `publishedAs` (e.g. \"2,000,000+\"), report that bound rather than the number.\n\n" +
+  "5. With `get_census_table`, first list the table's variables (optionally with `labelFilter`), then request only the variable IDs you need. Use the returned MOE, standard error, and CV; if a value has `publishedAs` (e.g. \"2,000,000+\"), report that bound rather than the number.\n" +
+  "6. NEVER GUESS A VARIABLE'S MEANING: Census downloads (data.census.gov, or a Census dataset's `direct_download_url`) contain only codes such as DP04_0047E, with no labels, and neighbouring codes often mean very different things (in DP04, 0045 is occupied units, 0046 owner-occupied and 0047 renter-occupied). Before reporting any value from such a download, get the label of every code you use by listing the table's variables with `get_census_table` (with `labelFilter`), and use only codes whose labels you have seen. " +
+  "Then check the parts against their total (e.g. owner-occupied + renter-occupied = occupied housing units) and each percentage against count ÷ total; if they do not match, you have the wrong codes, so look them up again before writing the answer.\n\n" +
   "AVAILABLE PRE-INSTALLED PYTHON LIBRARIES:\n" +
   "Only the following libraries are available in the E2B sandbox. Do not import anything not listed here:\n" +
   "• Data & Tables: `pandas`, `numpy`, `openpyxl`, `xlrd`, `xarray`\n" +
@@ -180,6 +182,7 @@ const BASE_INSTRUCTIONS =
   "3. Before measuring area or overlap, reproject every layer to the same projected CRS, e.g. `utm = gdf.estimate_utm_crs(); gdf = gdf.to_crs(utm)`. Never compute area in latitude/longitude (EPSG:4326).\n" +
   "4. Use `gdf1.overlay(gdf2, how='intersection')` for overlaps and `gpd.sjoin` for containment. Report shares as intersection area ÷ total area.\n" +
   "5. When building district totals from Census tracts, a tract may be only partly inside a district: report the fraction of each tract inside, and state whether totals are area-weighted or include whole tracts.\n" +
+  "   The same applies to places (Census Designated Places) found by overlay: compute each place's population (`pop20`) or area share inside the district. Name a place as being in the district only if most of it is inside; write \"part of\" for a place that is split; and leave out places that only touch the boundary (a few percent or less inside), since adjacent towns often overlap a district by a sliver.\n" +
   "6. Address → district: geocode the street address with the U.S. Census Geocoder via `requests` " +
   "(`https://geocoding.geo.census.gov/geocoder/geographies/onelineaddress?address=...&benchmark=Public_AR_Current&vintage=Current_Current&layers=all&format=json`), " +
   "which returns coordinates plus Census tract, block group and state legislative districts. To use an older district plan, build a point from the returned coordinates and `gpd.sjoin` it with that plan's layer. " +
