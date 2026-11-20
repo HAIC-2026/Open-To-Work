@@ -30,7 +30,6 @@ import {
   Quote,
   Receipt,
   Wrench,
-  AlertCircle,
   Landmark,
   HandHeart,
 } from "lucide-react"
@@ -54,7 +53,7 @@ function getToolMeta(toolName?: string) {
         label: "Python Sandbox",
         runningText: "Executing Python data analysis in E2B sandbox...",
         doneText: "Executed Python data analysis",
-        errorText: "Python execution failed",
+        errorText: "Attempted Python data analysis",
       }
     case "search_datasets":
       return {
@@ -62,7 +61,7 @@ function getToolMeta(toolName?: string) {
         label: "Hawaii Data Catalog",
         runningText: "Searching official Hawaii datasets...",
         doneText: "Searched Hawaii open data catalog",
-        errorText: "Dataset search failed",
+        errorText: "Attempted Hawaii dataset search",
       }
     case "get_dataset_details":
       return {
@@ -70,7 +69,7 @@ function getToolMeta(toolName?: string) {
         label: "Dataset Schema",
         runningText: "Inspecting Hawaii dataset schema...",
         doneText: "Loaded dataset schema & metadata",
-        errorText: "Failed to load dataset schema",
+        errorText: "Attempted to load dataset schema",
       }
     case "explore_data_sources":
       return {
@@ -78,7 +77,7 @@ function getToolMeta(toolName?: string) {
         label: "Hawaii Agencies",
         runningText: "Exploring Hawaii public data sources...",
         doneText: "Explored Hawaii data sources",
-        errorText: "Failed to load data sources",
+        errorText: "Attempted to load data sources",
       }
     case "get_census_table":
       return {
@@ -86,7 +85,7 @@ function getToolMeta(toolName?: string) {
         label: "Census Data API",
         runningText: "Fetching Census Bureau data...",
         doneText: "Fetched Census Bureau data",
-        errorText: "Census data request failed",
+        errorText: "Attempted Census data request",
       }
     case "search_programs":
       return {
@@ -94,7 +93,7 @@ function getToolMeta(toolName?: string) {
         label: "Program Inventory",
         runningText: "Searching public programs...",
         doneText: "Searched public programs",
-        errorText: "Program search failed",
+        errorText: "Attempted program search",
       }
     case "get_state_tax_collections":
       return {
@@ -102,7 +101,7 @@ function getToolMeta(toolName?: string) {
         label: "Census State Tax Collections",
         runningText: "Fetching state tax collections...",
         doneText: "Fetched state tax collections",
-        errorText: "State tax collections request failed",
+        errorText: "Attempted state tax collections request",
       }
     case "cite_sources":
       return {
@@ -110,7 +109,7 @@ function getToolMeta(toolName?: string) {
         label: "Source Attribution",
         runningText: "Attributing used Hawaii data sources...",
         doneText: "Attributed verified data sources",
-        errorText: "Failed to attribute data sources",
+        errorText: "Attempted to attribute data sources",
       }
     default:
       return {
@@ -118,7 +117,7 @@ function getToolMeta(toolName?: string) {
         label: toolName || "Tool",
         runningText: `Running ${toolName}...`,
         doneText: `Ran ${toolName}`,
-        errorText: `${toolName} failed`,
+        errorText: `Attempted ${toolName}`,
       }
   }
 }
@@ -230,11 +229,8 @@ export function AgentTrace({
                 (part.output && part.output.success === false) ||
                 (part.result && part.result.success === false)
 
-              const status: "running" | "error" | undefined = isRunning
-                ? "running"
-                : isError
-                ? "error"
-                : undefined
+              // Failed steps are shown neutrally ("Attempted …"), not as red errors.
+              const status: "running" | undefined = isRunning ? "running" : undefined
 
               const input = part.input || part.args || {}
               const output = part.output || part.result
@@ -275,7 +271,7 @@ export function AgentTrace({
                   : isInterrupted
                   ? `${purpose} (halted)`
                   : isError
-                  ? `Failed: ${purpose}`
+                  ? `Attempted: ${purpose}`
                   : purpose
               } else if (rawToolName === "get_census_table" && input.table) {
                 const survey =
@@ -296,7 +292,7 @@ export function AgentTrace({
                   : isInterrupted
                   ? `Fetching ${what} (halted)`
                   : isError || output?.error
-                  ? `Census request for ${input.table} failed`
+                  ? `Attempted: Fetching ${what} from the Census Bureau`
                   : input.variables?.length
                   ? `Fetched ${what} from the Census Bureau`
                   : `Listed ${what}`
@@ -308,7 +304,7 @@ export function AgentTrace({
                   : isInterrupted
                   ? `Searching ${what} (halted)`
                   : isError
-                  ? "Program search failed"
+                  ? `Attempted: Searching ${what}`
                   : count !== undefined
                   ? `Found ${count} ${count === 1 ? "program" : "programs"}${input?.query ? ` matching "${input.query}"` : ""}`
                   : `Searched ${what}`
@@ -324,7 +320,7 @@ export function AgentTrace({
                   : isInterrupted
                   ? `Fetching Hawaiʻi state tax collections for ${years} (halted)`
                   : isError || output?.error
-                  ? `State tax collections request for ${years} failed`
+                  ? `Attempted: Fetching Hawaiʻi state tax collections for ${years}`
                   : `Fetched Hawaiʻi state tax collections for ${years} from the Census Bureau`
               } else if (rawToolName === "cite_sources") {
                 const count = output?.count ?? output?.sources?.length ?? input?.sources?.length
@@ -342,8 +338,6 @@ export function AgentTrace({
                   <TraceIcon>
                     {isRunning ? (
                       <Spinner className="size-3.5 animate-spin text-primary" />
-                    ) : isError ? (
-                      <AlertCircle className="size-3.5 text-destructive" />
                     ) : (
                       // A finished step shows what kind of step it was.
                       <IconComponent className="size-3.5" aria-hidden="true" />
@@ -355,13 +349,9 @@ export function AgentTrace({
                       <TraceDescription>
                         Halted
                       </TraceDescription>
-                    ) : activeThinking ? (
+                    ) : activeThinking && !isError ? (
                       <TraceDescription>
-                        {isError ? "Error" : "Done"}
-                      </TraceDescription>
-                    ) : isError ? (
-                      <TraceDescription>
-                        Error
+                        Done
                       </TraceDescription>
                     ) : null
                   )}
@@ -412,7 +402,7 @@ export function AgentTrace({
                           </CodeBlock>
                         )}
                         {(output?.stderr || part.errorText) && (
-                          <CodeBlock size="sm" variant="destructive">
+                          <CodeBlock size="sm">
                             <CodeBlockHeader>
                               <CodeBlockTitle>Standard Error / Traceback</CodeBlockTitle>
                             </CodeBlockHeader>
